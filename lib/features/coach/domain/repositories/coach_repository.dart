@@ -10,6 +10,13 @@ abstract interface class CoachRepository {
   /// & cache. Bila offline tanpa cache valid → melempar error.
   Future<Roster> roster(String extracurricularId);
 
+  /// Resolusi hasil scan QR → siswa (butuh online).
+  /// Melempar [QrScanException] untuk QR_INVALID / NOT_A_MEMBER.
+  Future<RosterStudent> resolveQr({
+    required String qrToken,
+    required String extracurricularId,
+  });
+
   /// Simpan/segarkan draft sesi ke local DB (dipanggil terus selama pembina mengisi).
   Future<void> saveDraft({
     required String clientGeneratedId,

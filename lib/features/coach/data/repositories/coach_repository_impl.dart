@@ -41,6 +41,29 @@ class CoachRepositoryImpl implements CoachRepository {
   }
 
   @override
+  Future<RosterStudent> resolveQr({
+    required String qrToken,
+    required String extracurricularId,
+  }) async {
+    final Response<dynamic> res;
+    try {
+      res = await _remote.qrScan(qrToken, extracurricularId);
+    } on DioException {
+      throw QrScanException('OFFLINE', 'Scan QR butuh koneksi internet.');
+    }
+    final code = res.statusCode ?? 0;
+    final body = res.data;
+    if (code == 200 && body is Map && body['student'] is Map) {
+      return RosterStudent.fromJson(Map<String, dynamic>.from(body['student'] as Map));
+    }
+    if (body is Map && body['error'] is String) {
+      throw QrScanException(body['error'] as String,
+          (body['message'] as String?) ?? 'Kartu QR tidak dapat digunakan.');
+    }
+    throw QrScanException('UNKNOWN', 'Gagal memproses kartu QR (HTTP $code).');
+  }
+
+  @override
   Future<void> saveDraft({
     required String clientGeneratedId,
     required String extracurricularId,

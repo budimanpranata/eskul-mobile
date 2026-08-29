@@ -51,6 +51,17 @@ class FakeRemote implements CoachRemoteDataSource {
   }
 
   @override
+  Future<Response<dynamic>> qrScan(String qrToken, String extracurricularId) async {
+    return Response<dynamic>(
+      requestOptions: RequestOptions(path: '/coach/students/qr-scan'),
+      statusCode: 200,
+      data: {
+        'student': {'id': 's1', 'nis': 'N1', 'fullName': 'Ahmad', 'classGrade': '4A', 'photoUrl': null},
+      },
+    );
+  }
+
+  @override
   Future<Map<String, dynamic>> roster(String id) async => {
         'extracurricular': {'name': 'Sepak Bola'},
         'students': [

@@ -18,6 +18,13 @@ class CoachRemoteDataSource {
     return r.data!;
   }
 
+  Future<Response<dynamic>> qrScan(String qrToken, String extracurricularId) {
+    return _dio.post<dynamic>(
+      '/coach/students/qr-scan',
+      data: {'qr_token': qrToken, 'extracurricular_id': extracurricularId},
+    );
+  }
+
   /// Mengembalikan Response mentah agar repository memetakan 201/409/422.
   Future<Response<dynamic>> submit(Map<String, dynamic> payload) {
     return _dio.post<dynamic>(

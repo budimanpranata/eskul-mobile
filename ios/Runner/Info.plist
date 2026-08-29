@@ -14,6 +14,8 @@
 	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>eskul_mobile</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Kamera dipakai untuk memindai QR Code kartu siswa saat presensi.</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

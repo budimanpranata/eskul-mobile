@@ -8,6 +8,7 @@ import '../../data/local/local_session_store.dart';
 import '../../data/submit_outcome.dart';
 import '../../domain/entities/coach_entities.dart';
 import '../providers/coach_providers.dart';
+import 'qr_scan_page.dart';
 
 /// Layar Sesi Ekskul — Tab "Presensi Cepat" + Tab "Materi Latihan" (bagian 5.1).
 /// Offline-first: draft otomatis tersimpan ke local DB; submit saat offline
@@ -137,6 +138,20 @@ class _SessionPageState extends ConsumerState<SessionPage>
           tabs: const [Tab(text: 'Presensi Cepat'), Tab(text: 'Materi Latihan')],
         ),
       ),
+      floatingActionButton: rosterAsync.value == null
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => QrScanPage(extracurricularId: _ekskulId),
+                  ),
+                );
+                _persistDraft();
+              },
+              icon: const Icon(Icons.qr_code_scanner),
+              label: const Text('Scan QR'),
+            ),
       body: Column(
         children: [
           if (!online)

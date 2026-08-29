@@ -151,3 +151,12 @@ class SessionAlreadySyncedException implements Exception {
   SessionAlreadySyncedException(this.existingSessionId);
   final String? existingSessionId;
 }
+
+/// Scan QR gagal: token tak dikenal (QR_INVALID) atau bukan anggota (NOT_A_MEMBER).
+class QrScanException implements Exception {
+  QrScanException(this.code, this.message);
+  final String code;
+  final String message;
+  @override
+  String toString() => message;
+}
