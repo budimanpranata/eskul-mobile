@@ -1,32 +1,86 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../core/network/connectivity.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../../core/storage/local_database.dart';
 import '../../data/datasources/coach_remote_datasource.dart';
+import '../../data/local/local_session_store.dart';
+import '../../data/local/roster_cache.dart';
 import '../../data/repositories/coach_repository_impl.dart';
 import '../../domain/entities/coach_entities.dart';
 import '../../domain/repositories/coach_repository.dart';
+import '../../sync/sync_engine.dart';
+
+final localSessionStoreProvider =
+    Provider<LocalSessionStore>((ref) => LocalSessionStore(ref.watch(appDatabaseProvider)));
+
+final rosterCacheProvider =
+    Provider<RosterCache>((ref) => RosterCache(ref.watch(appDatabaseProvider)));
+
+final coachRemoteProvider =
+    Provider<CoachRemoteDataSource>((ref) => CoachRemoteDataSource(ref.watch(dioProvider)));
 
 final coachRepositoryProvider = Provider<CoachRepository>((ref) {
-  return CoachRepositoryImpl(CoachRemoteDataSource(ref.watch(dioProvider)));
+  return CoachRepositoryImpl(
+    remote: ref.watch(coachRemoteProvider),
+    store: ref.watch(localSessionStoreProvider),
+    rosterCache: ref.watch(rosterCacheProvider),
+    isOnline: isDeviceOnline,
+  );
 });
 
-/// GET /coach/today-sessions — di-refresh dengan `ref.invalidate`.
+final syncEngineProvider = Provider<SyncEngine>((ref) {
+  final engine = SyncEngine(
+    remote: ref.watch(coachRemoteProvider),
+    store: ref.watch(localSessionStoreProvider),
+    rosterCache: ref.watch(rosterCacheProvider),
+  );
+  ref.onDispose(engine.dispose);
+  return engine;
+});
+
+/// Aktif selama ada sesi Pembina: jalankan sync saat online + periodik.
+final syncSchedulerProvider = Provider<void>((ref) {
+  final engine = ref.watch(syncEngineProvider);
+  engine.startPeriodic();
+  ref.listen(connectivityProvider, (_, next) {
+    if (next.value == true) {
+      engine.syncNow().then((_) => ref.invalidate(pendingSessionsProvider));
+    }
+  });
+});
+
 final todaySessionsProvider = FutureProvider.autoDispose<TodaySessionsResult>((ref) {
   return ref.watch(coachRepositoryProvider).todaySessions();
 });
 
-/// GET /coach/extracurriculars/:id/roster
 final rosterProvider =
     FutureProvider.autoDispose.family<Roster, String>((ref, extracurricularId) {
   return ref.watch(coachRepositoryProvider).roster(extracurricularId);
 });
 
-/// Draft presensi per ekstrakurikuler (untuk hari ini).
-///
-/// `clientGeneratedId` dibuat SATU KALI saat draft pertama dibuka dan dipakai
-/// ulang selama draft belum dikirim — penting untuk idempotency (Fase 2 offline).
-/// Setelah submit sukses, panggil [clear] agar sesi berikutnya memakai id baru.
+/// Daftar sesi lokal untuk layar Riwayat + badge pending.
+final pendingSessionsProvider = FutureProvider.autoDispose<List<PendingSession>>((ref) {
+  return ref.watch(localSessionStoreProvider).listAll();
+});
+
+final pendingSyncCountProvider = FutureProvider.autoDispose<int>((ref) {
+  return ref.watch(localSessionStoreProvider).pendingCount();
+});
+
+/// Trigger sync manual (mis. tombol di layar Riwayat).
+final manualSyncProvider = Provider((ref) {
+  return () async {
+    final report = await ref.read(syncEngineProvider).syncNow();
+    ref.invalidate(pendingSessionsProvider);
+    ref.invalidate(pendingSyncCountProvider);
+    return report;
+  };
+});
+
+// ---------------- Draft in-memory (dari Fase 1.3) ----------------
+
 class AttendanceDraft {
   const AttendanceDraft({
     required this.clientGeneratedId,
@@ -71,7 +125,17 @@ class AttendanceDraftsNotifier extends Notifier<Map<String, AttendanceDraft>> {
     return fresh;
   }
 
-  /// Isi default semua siswa "Hadir" saat roster pertama kali dimuat.
+  /// Adopsi client_generated_id dari draft lokal yang sudah ada (agar idempoten
+  /// saat pembina membuka ulang sesi setelah aplikasi ditutup).
+  void adoptExistingId(String extracurricularId, String clientGeneratedId) {
+    final cur = state[extracurricularId];
+    if (cur != null && cur.clientGeneratedId == clientGeneratedId) return;
+    state = {
+      ...state,
+      extracurricularId: AttendanceDraft(clientGeneratedId: clientGeneratedId),
+    };
+  }
+
   void seedRoster(String extracurricularId, List<String> studentIds) {
     final d = draftFor(extracurricularId);
     if (d.statuses.isNotEmpty) return;
@@ -88,9 +152,7 @@ class AttendanceDraftsNotifier extends Notifier<Map<String, AttendanceDraft>> {
     final current = d.statuses[studentId] ?? AttendanceStatus.hadir;
     state = {
       ...state,
-      extracurricularId: d.copyWith(
-        statuses: {...d.statuses, studentId: current.next},
-      ),
+      extracurricularId: d.copyWith(statuses: {...d.statuses, studentId: current.next}),
     };
   }
 

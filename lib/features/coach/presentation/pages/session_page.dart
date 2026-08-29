@@ -3,10 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/network/connectivity.dart';
+import '../../data/local/local_session_store.dart';
+import '../../data/submit_outcome.dart';
 import '../../domain/entities/coach_entities.dart';
 import '../providers/coach_providers.dart';
 
 /// Layar Sesi Ekskul — Tab "Presensi Cepat" + Tab "Materi Latihan" (bagian 5.1).
+/// Offline-first: draft otomatis tersimpan ke local DB; submit saat offline
+/// menandai PENDING_SYNC dan disinkronkan otomatis saat online (bagian 6).
 class SessionPage extends ConsumerStatefulWidget {
   const SessionPage({super.key, required this.extracurricularId, required this.session});
 
@@ -17,15 +22,16 @@ class SessionPage extends ConsumerStatefulWidget {
   ConsumerState<SessionPage> createState() => _SessionPageState();
 }
 
-class _SessionPageState extends ConsumerState<SessionPage> with SingleTickerProviderStateMixin {
+class _SessionPageState extends ConsumerState<SessionPage>
+    with SingleTickerProviderStateMixin {
   late final TabController _tabs = TabController(length: 2, vsync: this);
   final _descCtrl = TextEditingController();
   final _targetCtrl = TextEditingController();
   bool _submitting = false;
-
-  /// index siswa (dari path `attendances[i]`) → pesan error validasi.
+  bool _restored = false;
   Map<int, String> _rowErrors = {};
 
+  final _sessionDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
   String get _ekskulId => widget.extracurricularId;
 
   @override
@@ -34,6 +40,9 @@ class _SessionPageState extends ConsumerState<SessionPage> with SingleTickerProv
     final draft = ref.read(attendanceDraftsProvider.notifier).draftFor(_ekskulId);
     _descCtrl.text = draft.materialDescription;
     _targetCtrl.text = draft.targetAchievement;
+
+    // Tulis-lewat: setiap perubahan draft → simpan payload ke local DB.
+    ref.listenManual(attendanceDraftsProvider, (_, __) => _persistDraft());
   }
 
   @override
@@ -44,72 +53,46 @@ class _SessionPageState extends ConsumerState<SessionPage> with SingleTickerProv
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final rosterAsync = ref.watch(rosterProvider(_ekskulId));
-    final title = widget.session?.extracurricularName ?? 'Sesi Ekskul';
+  Future<void> _restoreLocalDraft(Roster roster) async {
+    if (_restored) return;
+    _restored = true;
+    final store = ref.read(localSessionStoreProvider);
+    final existing = await store.findByEkskulDate(_ekskulId, _sessionDate);
+    final notifier = ref.read(attendanceDraftsProvider.notifier);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(title),
-        bottom: TabBar(
-          controller: _tabs,
-          tabs: const [Tab(text: 'Presensi Cepat'), Tab(text: 'Materi Latihan')],
-        ),
-      ),
-      body: rosterAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Gagal memuat roster.\n$e', textAlign: TextAlign.center)),
-        data: (roster) {
-          // Seed default "Hadir" sekali.
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            ref
-                .read(attendanceDraftsProvider.notifier)
-                .seedRoster(_ekskulId, roster.students.map((s) => s.id).toList());
-          });
-          return TabBarView(
-            controller: _tabs,
-            children: [
-              _PresenceTab(
-                ekskulId: _ekskulId,
-                students: roster.students,
-                rowErrors: _rowErrors,
-              ),
-              _MaterialTab(
-                ekskulId: _ekskulId,
-                descCtrl: _descCtrl,
-                targetCtrl: _targetCtrl,
-              ),
-            ],
-          );
-        },
-      ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-        child: FilledButton(
-          onPressed: _submitting || rosterAsync.value == null
-              ? null
-              : () => _submit(rosterAsync.value!),
-          child: Text(_submitting ? 'Mengirim…' : 'Submit Presensi & Materi'),
-        ),
-      ),
-    );
+    if (existing != null && existing.status != SyncStatus.synced) {
+      notifier.adoptExistingId(_ekskulId, existing.clientGeneratedId);
+      final atts = (existing.payload['attendances'] as List?) ?? const [];
+      for (final a in atts) {
+        final m = a as Map;
+        final st = AttendanceStatus.values.firstWhere(
+          (s) => s.code == m['status'],
+          orElse: () => AttendanceStatus.hadir,
+        );
+        notifier.setStatus(_ekskulId, m['student_id'] as String, st);
+      }
+      final mat = existing.payload['material'] as Map?;
+      if (mat != null) {
+        _descCtrl.text = (mat['description'] as String?) ?? '';
+        _targetCtrl.text = (mat['target_achievement'] as String?) ?? '';
+        notifier.setMaterial(_ekskulId,
+            description: _descCtrl.text,
+            durationMinutes: (mat['duration_minutes'] as int?) ?? 90,
+            targetAchievement: _targetCtrl.text);
+      }
+    }
+    notifier.seedRoster(_ekskulId, roster.students.map((s) => s.id).toList());
+    _persistDraft(roster: roster);
+    if (mounted) setState(() {});
   }
 
-  Future<void> _submit(Roster roster) async {
-    setState(() {
-      _submitting = true;
-      _rowErrors = {};
-    });
-    final notifier = ref.read(attendanceDraftsProvider.notifier);
-    final draft = notifier.draftFor(_ekskulId);
+  Map<String, dynamic> _buildPayload(Roster roster, AttendanceDraft draft) {
     final s = widget.session;
-
-    final payload = <String, dynamic>{
+    return {
       'client_generated_id': draft.clientGeneratedId,
       'extracurricular_id': _ekskulId,
       if (s != null) 'schedule_id': s.scheduleId,
-      'session_date': DateFormat('yyyy-MM-dd').format(DateTime.now()),
+      'session_date': _sessionDate,
       if (s != null) 'start_time': s.startTime,
       if (s != null) 'end_time': s.endTime,
       if (s?.location != null) 'location': s!.location,
@@ -125,35 +108,132 @@ class _SessionPageState extends ConsumerState<SessionPage> with SingleTickerProv
               })
           .toList(),
     };
+  }
+
+  void _persistDraft({Roster? roster}) {
+    final r = roster ?? ref.read(rosterProvider(_ekskulId)).value;
+    if (r == null) return;
+    final draft = ref.read(attendanceDraftsProvider.notifier).draftFor(_ekskulId);
+    ref.read(coachRepositoryProvider).saveDraft(
+          clientGeneratedId: draft.clientGeneratedId,
+          extracurricularId: _ekskulId,
+          extracurricularName: widget.session?.extracurricularName,
+          sessionDate: _sessionDate,
+          payload: _buildPayload(r, draft),
+        );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final rosterAsync = ref.watch(rosterProvider(_ekskulId));
+    final online = ref.watch(connectivityProvider).value ?? true;
+    final title = widget.session?.extracurricularName ?? 'Sesi Ekskul';
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(title),
+        bottom: TabBar(
+          controller: _tabs,
+          tabs: const [Tab(text: 'Presensi Cepat'), Tab(text: 'Materi Latihan')],
+        ),
+      ),
+      body: Column(
+        children: [
+          if (!online)
+            Container(
+              width: double.infinity,
+              color: const Color(0xFFFFF3CD),
+              padding: const EdgeInsets.all(10),
+              child: const Text(
+                'Mode offline — presensi tersimpan di perangkat dan akan disinkronkan otomatis saat online.',
+                style: TextStyle(color: Color(0xFF7A5B00)),
+              ),
+            ),
+          Expanded(
+            child: rosterAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) =>
+                  Center(child: Text('Gagal memuat roster.\n$e', textAlign: TextAlign.center)),
+              data: (roster) {
+                WidgetsBinding.instance.addPostFrameCallback((_) => _restoreLocalDraft(roster));
+                return TabBarView(
+                  controller: _tabs,
+                  children: [
+                    _PresenceTab(ekskulId: _ekskulId, students: roster.students, rowErrors: _rowErrors),
+                    _MaterialTab(ekskulId: _ekskulId, descCtrl: _descCtrl, targetCtrl: _targetCtrl),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+        child: FilledButton(
+          onPressed: _submitting || rosterAsync.value == null
+              ? null
+              : () => _submit(rosterAsync.value!),
+          child: Text(_submitting
+              ? 'Menyimpan…'
+              : online
+                  ? 'Submit Presensi & Materi'
+                  : 'Simpan (akan disinkron saat online)'),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submit(Roster roster) async {
+    setState(() {
+      _submitting = true;
+      _rowErrors = {};
+    });
+    final notifier = ref.read(attendanceDraftsProvider.notifier);
+    final repo = ref.read(coachRepositoryProvider);
+    final draft = notifier.draftFor(_ekskulId);
+    notifier.setMaterial(_ekskulId,
+        description: _descCtrl.text.trim(), targetAchievement: _targetCtrl.text.trim());
+
+    // Pastikan payload terbaru tersimpan lokal sebelum submit.
+    await repo.saveDraft(
+      clientGeneratedId: draft.clientGeneratedId,
+      extracurricularId: _ekskulId,
+      extracurricularName: widget.session?.extracurricularName,
+      sessionDate: _sessionDate,
+      payload: _buildPayload(roster, draft),
+    );
 
     try {
-      notifier.setMaterial(_ekskulId,
-          description: _descCtrl.text.trim(), targetAchievement: _targetCtrl.text.trim());
-      final result = await ref.read(coachRepositoryProvider).submitAttendance(payload);
-      notifier.clear(_ekskulId);
+      final outcome = await repo.submit(draft.clientGeneratedId);
+      ref.invalidate(pendingSessionsProvider);
       ref.invalidate(todaySessionsProvider);
       if (!mounted) return;
-      final sm = result.summary;
-      _toast('Berhasil disinkronkan — ${sm.hadir} hadir, ${sm.izin} izin, '
-          '${sm.sakit} sakit, ${sm.alpa} alpa.');
-      context.pop();
+      switch (outcome) {
+        case SubmitSynced(:final result):
+          notifier.clear(_ekskulId);
+          final sm = result.summary;
+          _toast('Berhasil disinkronkan — ${sm.hadir} hadir, ${sm.izin} izin, '
+              '${sm.sakit} sakit, ${sm.alpa} alpa.');
+          context.pop();
+        case SubmitAlreadySynced():
+          notifier.clear(_ekskulId);
+          _toast('Sesi ini sudah pernah disinkronkan.');
+          context.pop();
+        case SubmitQueuedOffline():
+          notifier.clear(_ekskulId);
+          _toast('Tersimpan. Akan disinkronkan otomatis saat online.');
+          context.pop();
+      }
     } on SubmitValidationException catch (e) {
       final rowErrors = <int, String>{};
       for (final d in e.details) {
         final m = RegExp(r'attendances\[(\d+)\]').firstMatch(d.field);
-        if (m != null) {
-          rowErrors[int.parse(m.group(1)!)] = d.message;
-        }
+        if (m != null) rowErrors[int.parse(m.group(1)!)] = d.message;
       }
       setState(() => _rowErrors = rowErrors);
       _toast(rowErrors.isEmpty ? e.toString() : 'Ada ${e.details.length} data tidak valid.');
       if (rowErrors.isNotEmpty) _tabs.animateTo(0);
-    } on SessionAlreadySyncedException {
-      notifier.clear(_ekskulId);
-      ref.invalidate(todaySessionsProvider);
-      if (!mounted) return;
-      _toast('Sesi ini sudah pernah disubmit sebelumnya.');
-      context.pop();
     } catch (e) {
       _toast('Gagal submit: $e');
     } finally {
@@ -197,16 +277,11 @@ class _PresenceTab extends ConsumerWidget {
           onLongPress: () => _pickStatus(context, notifier, st.id),
           leading: CircleAvatar(child: Text(st.fullName.characters.first)),
           title: Text(st.fullName),
-          subtitle: Text(
-            err ?? '${st.classGrade} · ${st.nis}',
-            style: err != null ? const TextStyle(color: Colors.red) : null,
-          ),
+          subtitle: Text(err ?? '${st.classGrade} · ${st.nis}',
+              style: err != null ? const TextStyle(color: Colors.red) : null),
           trailing: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: _colors[status],
-              borderRadius: BorderRadius.circular(20),
-            ),
+            decoration: BoxDecoration(color: _colors[status], borderRadius: BorderRadius.circular(20)),
             child: Text(status.label,
                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
           ),
@@ -238,11 +313,7 @@ class _PresenceTab extends ConsumerWidget {
 
 /* -------- Tab Materi -------- */
 class _MaterialTab extends ConsumerWidget {
-  const _MaterialTab({
-    required this.ekskulId,
-    required this.descCtrl,
-    required this.targetCtrl,
-  });
+  const _MaterialTab({required this.ekskulId, required this.descCtrl, required this.targetCtrl});
 
   final String ekskulId;
   final TextEditingController descCtrl;
@@ -261,10 +332,9 @@ class _MaterialTab extends ConsumerWidget {
           controller: descCtrl,
           minLines: 3,
           maxLines: 6,
+          onChanged: (v) => notifier.setMaterial(ekskulId, description: v),
           decoration: const InputDecoration(
-            labelText: 'Deskripsi latihan',
-            border: OutlineInputBorder(),
-          ),
+              labelText: 'Deskripsi latihan', border: OutlineInputBorder()),
         ),
         const SizedBox(height: 16),
         Row(
@@ -279,7 +349,8 @@ class _MaterialTab extends ConsumerWidget {
             ),
             SizedBox(
               width: 48,
-              child: Text('$duration', textAlign: TextAlign.center, style: const TextStyle(fontSize: 18)),
+              child: Text('$duration',
+                  textAlign: TextAlign.center, style: const TextStyle(fontSize: 18)),
             ),
             IconButton.filledTonal(
               onPressed: () => notifier.setMaterial(ekskulId, durationMinutes: duration + 5),
@@ -292,10 +363,9 @@ class _MaterialTab extends ConsumerWidget {
           controller: targetCtrl,
           minLines: 2,
           maxLines: 4,
+          onChanged: (v) => notifier.setMaterial(ekskulId, targetAchievement: v),
           decoration: const InputDecoration(
-            labelText: 'Target capaian',
-            border: OutlineInputBorder(),
-          ),
+              labelText: 'Target capaian', border: OutlineInputBorder()),
         ),
       ],
     );

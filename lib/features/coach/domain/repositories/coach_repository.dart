@@ -1,14 +1,26 @@
+import '../../data/submit_outcome.dart';
 import '../entities/coach_entities.dart';
 
-/// Kontrak fitur Pembina (presensi online-only untuk Fase 1.3).
+/// Kontrak fitur Pembina — offline-first sejak Fase 2.1.
 abstract interface class CoachRepository {
-  /// GET /coach/today-sessions
+  /// GET /coach/today-sessions (online).
   Future<TodaySessionsResult> todaySessions();
 
-  /// GET /coach/extracurriculars/{id}/roster
+  /// Roster: dari cache lokal bila belum kedaluwarsa (14 hari), selain itu fetch
+  /// & cache. Bila offline tanpa cache valid → melempar error.
   Future<Roster> roster(String extracurricularId);
 
-  /// POST /attendance/submit (kontrak dokumen desain 4.1).
-  /// Melempar [SubmitValidationException] pada 422, [SessionAlreadySyncedException] pada 409.
-  Future<SubmitResult> submitAttendance(Map<String, dynamic> payload);
+  /// Simpan/segarkan draft sesi ke local DB (dipanggil terus selama pembina mengisi).
+  Future<void> saveDraft({
+    required String clientGeneratedId,
+    required String extracurricularId,
+    String? extracurricularName,
+    required String sessionDate,
+    required Map<String, dynamic> payload,
+  });
+
+  /// Submit sesi (berdasarkan draft lokal `clientGeneratedId`).
+  /// Online → kirim; offline/koneksi putus → tandai PENDING_SYNC.
+  /// 422 → melempar [SubmitValidationException].
+  Future<SubmitOutcome> submit(String clientGeneratedId);
 }
