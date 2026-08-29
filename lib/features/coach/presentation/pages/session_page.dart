@@ -66,11 +66,21 @@ class _SessionPageState extends ConsumerState<SessionPage>
       final atts = (existing.payload['attendances'] as List?) ?? const [];
       for (final a in atts) {
         final m = a as Map;
+        final sid = m['student_id'] as String;
         final st = AttendanceStatus.values.firstWhere(
           (s) => s.code == m['status'],
           orElse: () => AttendanceStatus.hadir,
         );
-        notifier.setStatus(_ekskulId, m['student_id'] as String, st);
+        notifier.setStatus(_ekskulId, sid, st);
+        if (m['activeness_score'] != null || m['skill_notes'] != null || m['personal_notes'] != null) {
+          notifier.setEval(
+            _ekskulId,
+            sid,
+            activenessScore: m['activeness_score'] as int?,
+            skillNotes: (m['skill_notes'] as String?) ?? '',
+            personalNotes: (m['personal_notes'] as String?) ?? '',
+          );
+        }
       }
       final mat = existing.payload['material'] as Map?;
       if (mat != null) {
@@ -102,12 +112,20 @@ class _SessionPageState extends ConsumerState<SessionPage>
         'duration_minutes': draft.durationMinutes,
         if (_targetCtrl.text.trim().isNotEmpty) 'target_achievement': _targetCtrl.text.trim(),
       },
-      'attendances': roster.students
-          .map((st) => {
-                'student_id': st.id,
-                'status': (draft.statuses[st.id] ?? AttendanceStatus.hadir).code,
-              })
-          .toList(),
+      'attendances': roster.students.map((st) {
+        final status = draft.statuses[st.id] ?? AttendanceStatus.hadir;
+        final ev = draft.evals[st.id];
+        return {
+          'student_id': st.id,
+          'status': status.code,
+          // activeness_score hanya dikirim bila HADIR (backend menolak selain itu).
+          if (status == AttendanceStatus.hadir && ev?.activenessScore != null)
+            'activeness_score': ev!.activenessScore,
+          if (ev != null && ev.skillNotes.trim().isNotEmpty) 'skill_notes': ev.skillNotes.trim(),
+          if (ev != null && ev.personalNotes.trim().isNotEmpty)
+            'personal_notes': ev.personalNotes.trim(),
+        };
+      }).toList(),
     };
   }
 
@@ -286,40 +304,211 @@ class _PresenceTab extends ConsumerWidget {
       itemBuilder: (_, i) {
         final st = students[i];
         final status = draft?.statuses[st.id] ?? AttendanceStatus.hadir;
+        final ev = draft?.evals[st.id];
         final err = rowErrors[i];
         return ListTile(
           onTap: () => notifier.cycle(ekskulId, st.id),
-          onLongPress: () => _pickStatus(context, notifier, st.id),
+          onLongPress: () => showModalBottomSheet<void>(
+            context: context,
+            isScrollControlled: true,
+            builder: (_) => _EvalSheet(
+              ekskulId: ekskulId,
+              student: st,
+              status: status,
+              eval: ev ?? const StudentEval(),
+            ),
+          ),
           leading: CircleAvatar(child: Text(st.fullName.characters.first)),
           title: Text(st.fullName),
           subtitle: Text(err ?? '${st.classGrade} · ${st.nis}',
               style: err != null ? const TextStyle(color: Colors.red) : null),
-          trailing: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(color: _colors[status], borderRadius: BorderRadius.circular(20)),
-            child: Text(status.label,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (ev != null && !ev.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Icon(
+                    ev.activenessScore != null ? Icons.star : Icons.sticky_note_2_outlined,
+                    size: 18,
+                    color: Colors.amber.shade700,
+                  ),
+                ),
+              if (ev?.activenessScore != null)
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Text('${ev!.activenessScore}',
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration:
+                    BoxDecoration(color: _colors[status], borderRadius: BorderRadius.circular(20)),
+                child: Text(status.label,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+              ),
+            ],
           ),
         );
       },
     );
   }
+}
 
-  void _pickStatus(BuildContext context, AttendanceDraftsNotifier notifier, String studentId) {
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (_) => SafeArea(
+/* -------- Bottom sheet evaluasi per siswa (Fase 2.3) -------- */
+class _EvalSheet extends ConsumerStatefulWidget {
+  const _EvalSheet({
+    required this.ekskulId,
+    required this.student,
+    required this.status,
+    required this.eval,
+  });
+
+  final String ekskulId;
+  final RosterStudent student;
+  final AttendanceStatus status;
+  final StudentEval eval;
+
+  @override
+  ConsumerState<_EvalSheet> createState() => _EvalSheetState();
+}
+
+class _EvalSheetState extends ConsumerState<_EvalSheet> {
+  late AttendanceStatus _status = widget.status;
+  late int? _score = widget.eval.activenessScore;
+  late final _skill = TextEditingController(text: widget.eval.skillNotes);
+  late final _personal = TextEditingController(text: widget.eval.personalNotes);
+
+  @override
+  void dispose() {
+    _skill.dispose();
+    _personal.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final n = ref.read(attendanceDraftsProvider.notifier);
+    n.setStatus(widget.ekskulId, widget.student.id, _status);
+    n.setEval(
+      widget.ekskulId,
+      widget.student.id,
+      activenessScore: _status == AttendanceStatus.hadir ? _score : null,
+      skillNotes: _skill.text,
+      personalNotes: _personal.text,
+    );
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hadir = _status == AttendanceStatus.hadir;
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
+      child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: AttendanceStatus.values
-              .map((s) => ListTile(
-                    title: Text(s.label),
-                    onTap: () {
-                      notifier.setStatus(ekskulId, studentId, s);
-                      Navigator.pop(context);
-                    },
-                  ))
-              .toList(),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.student.fullName,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            Text('${widget.student.classGrade} · ${widget.student.nis}',
+                style: const TextStyle(color: Colors.black54)),
+            const SizedBox(height: 12),
+            const Text('Status'),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              children: AttendanceStatus.values
+                  .map((s) => ChoiceChip(
+                        label: Text(s.label),
+                        selected: _status == s,
+                        onSelected: (_) => setState(() => _status = s),
+                      ))
+                  .toList(),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Text('Nilai keaktifan (1–5)'),
+                const Spacer(),
+                if (_score != null)
+                  TextButton(
+                    onPressed: () => setState(() => _score = null),
+                    child: const Text('Hapus'),
+                  ),
+              ],
+            ),
+            if (!hadir)
+              const Padding(
+                padding: EdgeInsets.only(top: 2),
+                child: Text('Hanya untuk siswa HADIR.',
+                    style: TextStyle(color: Colors.black45, fontSize: 12)),
+              ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: List.generate(5, (i) {
+                final v = i + 1;
+                final on = _score == v;
+                return GestureDetector(
+                  onTap: hadir ? () => setState(() => _score = v) : null,
+                  child: CircleAvatar(
+                    radius: 22,
+                    backgroundColor: !hadir
+                        ? Colors.grey.shade200
+                        : on
+                            ? const Color(0xFF1E6F5C)
+                            : Colors.grey.shade300,
+                    child: Text('$v',
+                        style: TextStyle(
+                          color: on ? Colors.white : Colors.black87,
+                          fontWeight: FontWeight.bold,
+                        )),
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _skill,
+              minLines: 2,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Catatan keterampilan / pencapaian',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _personal,
+              minLines: 2,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Catatan khusus (personal)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Batal'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(onPressed: _save, child: const Text('Simpan')),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

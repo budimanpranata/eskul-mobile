@@ -81,10 +81,36 @@ final manualSyncProvider = Provider((ref) {
 
 // ---------------- Draft in-memory (dari Fase 1.3) ----------------
 
+/// Evaluasi opsional per siswa (Fase 2.3). Semua field boleh kosong.
+class StudentEval {
+  const StudentEval({this.activenessScore, this.skillNotes = '', this.personalNotes = ''});
+  final int? activenessScore; // 1..5
+  final String skillNotes;
+  final String personalNotes;
+
+  bool get isEmpty => activenessScore == null && skillNotes.isEmpty && personalNotes.isEmpty;
+
+  StudentEval copyWith({
+    Object? activenessScore = _sentinel,
+    String? skillNotes,
+    String? personalNotes,
+  }) =>
+      StudentEval(
+        activenessScore: identical(activenessScore, _sentinel)
+            ? this.activenessScore
+            : activenessScore as int?,
+        skillNotes: skillNotes ?? this.skillNotes,
+        personalNotes: personalNotes ?? this.personalNotes,
+      );
+
+  static const _sentinel = Object();
+}
+
 class AttendanceDraft {
   const AttendanceDraft({
     required this.clientGeneratedId,
     this.statuses = const {},
+    this.evals = const {},
     this.materialDescription = '',
     this.durationMinutes = 90,
     this.targetAchievement = '',
@@ -92,12 +118,14 @@ class AttendanceDraft {
 
   final String clientGeneratedId;
   final Map<String, AttendanceStatus> statuses;
+  final Map<String, StudentEval> evals;
   final String materialDescription;
   final int durationMinutes;
   final String targetAchievement;
 
   AttendanceDraft copyWith({
     Map<String, AttendanceStatus>? statuses,
+    Map<String, StudentEval>? evals,
     String? materialDescription,
     int? durationMinutes,
     String? targetAchievement,
@@ -105,6 +133,7 @@ class AttendanceDraft {
       AttendanceDraft(
         clientGeneratedId: clientGeneratedId,
         statuses: statuses ?? this.statuses,
+        evals: evals ?? this.evals,
         materialDescription: materialDescription ?? this.materialDescription,
         durationMinutes: durationMinutes ?? this.durationMinutes,
         targetAchievement: targetAchievement ?? this.targetAchievement,
@@ -161,6 +190,28 @@ class AttendanceDraftsNotifier extends Notifier<Map<String, AttendanceDraft>> {
     state = {
       ...state,
       extracurricularId: d.copyWith(statuses: {...d.statuses, studentId: status}),
+    };
+  }
+
+  void setEval(
+    String extracurricularId,
+    String studentId, {
+    Object? activenessScore = StudentEval._sentinel,
+    String? skillNotes,
+    String? personalNotes,
+  }) {
+    final d = draftFor(extracurricularId);
+    final cur = d.evals[studentId] ?? const StudentEval();
+    state = {
+      ...state,
+      extracurricularId: d.copyWith(evals: {
+        ...d.evals,
+        studentId: cur.copyWith(
+          activenessScore: activenessScore,
+          skillNotes: skillNotes,
+          personalNotes: personalNotes,
+        ),
+      }),
     };
   }
 

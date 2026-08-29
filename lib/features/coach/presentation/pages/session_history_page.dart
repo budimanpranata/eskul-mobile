@@ -47,10 +47,12 @@ class SessionHistoryPage extends ConsumerWidget {
               separatorBuilder: (_, __) => const Divider(height: 1),
               itemBuilder: (_, i) {
                 final s = rows[i];
+                final avg = _avgActiveness(s.payload);
                 return ListTile(
                   title: Text(s.extracurricularName ?? s.extracurricularId),
                   subtitle: Text([
                     s.sessionDate,
+                    'rata2 keaktifan: ${avg == null ? '—' : avg.toStringAsFixed(1)}',
                     if (s.attemptCount > 0) 'percobaan sync: ${s.attemptCount}',
                     if (s.lastError != null) 'terakhir: ${s.lastError}',
                   ].join(' · ')),
@@ -64,6 +66,18 @@ class SessionHistoryPage extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Rata-rata activeness_score dari payload lokal (null bila tak ada nilai).
+double? _avgActiveness(Map<String, dynamic> payload) {
+  final atts = (payload['attendances'] as List?) ?? const [];
+  final scores = atts
+      .map((a) => (a as Map)['activeness_score'])
+      .whereType<num>()
+      .map((n) => n.toDouble())
+      .toList();
+  if (scores.isEmpty) return null;
+  return scores.reduce((a, b) => a + b) / scores.length;
 }
 
 class _StatusBadge extends StatelessWidget {
