@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/dio_client.dart';
+import '../../../../core/push/device_registration.dart';
 import '../../../../core/storage/secure_storage.dart';
 import '../../data/datasources/auth_remote_datasource.dart';
 import '../../data/repositories/auth_repository_impl.dart';
@@ -31,11 +32,19 @@ class AuthSessionNotifier extends Notifier<AuthSession?> {
   @override
   AuthSession? build() => null;
 
+  Future<void> _afterAuth() async {
+    await registerDeviceToken(
+      ref.read(dioProvider),
+      ref.read(secureStorageProvider),
+    );
+  }
+
   Future<void> login(String identifier, String password) async {
     final session = await ref
         .read(authRepositoryProvider)
         .login(identifier: identifier, password: password);
     state = session;
+    await _afterAuth();
   }
 
   Future<void> registerParent({
@@ -55,6 +64,7 @@ class AuthSessionNotifier extends Notifier<AuthSession?> {
           consent: consent,
         );
     state = session;
+    await _afterAuth();
   }
 
   Future<void> logout() async {
@@ -74,5 +84,6 @@ final sessionRestoreProvider = FutureProvider<void>((ref) async {
   final restored = await ref.read(authRepositoryProvider).restoreSession();
   if (restored != null) {
     ref.read(authSessionProvider.notifier).setSession(restored);
+    await registerDeviceToken(ref.read(dioProvider), ref.read(secureStorageProvider));
   }
 });

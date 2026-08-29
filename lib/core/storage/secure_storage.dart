@@ -12,6 +12,7 @@ class SecureStorage {
   static const _kAccessToken = 'access_token';
   static const _kRefreshToken = 'refresh_token';
   static const _kSessionMeta = 'session_meta';
+  static const _kDeviceToken = 'device_token';
 
   Future<void> saveTokens({required String access, required String refresh}) async {
     await _storage.write(key: _kAccessToken, value: access);
@@ -30,9 +31,15 @@ class SecureStorage {
     return jsonDecode(raw) as Map<String, dynamic>;
   }
 
+  /// Token perangkat untuk push. Tetap dipertahankan lintas login (identitas device).
+  Future<String?> get deviceToken => _storage.read(key: _kDeviceToken);
+  Future<void> saveDeviceToken(String token) =>
+      _storage.write(key: _kDeviceToken, value: token);
+
   Future<void> clear() async {
     await _storage.delete(key: _kAccessToken);
     await _storage.delete(key: _kRefreshToken);
     await _storage.delete(key: _kSessionMeta);
+    // _kDeviceToken sengaja TIDAK dihapus saat logout.
   }
 }

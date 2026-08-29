@@ -9,7 +9,7 @@ import '../../features/coach/domain/entities/coach_entities.dart';
 import '../../features/coach/presentation/pages/coach_home_page.dart';
 import '../../features/coach/presentation/pages/session_page.dart';
 import '../../features/parent/presentation/pages/link_child_page.dart';
-import '../../features/parent/presentation/pages/parent_home_page.dart';
+import '../../features/parent/presentation/pages/parent_shell.dart';
 import '../constants/user_role.dart';
 
 /// Router aplikasi. Satu codebase, dua mode.
@@ -65,7 +65,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       // --- Mode Orang Tua ---
       GoRoute(
         path: '/parent',
-        builder: (_, __) => const ParentHomePage(),
+        builder: (_, __) => const ParentShell(),
         routes: [
           GoRoute(path: 'link-child', builder: (_, __) => const LinkChildPage()),
         ],

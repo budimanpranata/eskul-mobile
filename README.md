@@ -10,10 +10,10 @@ connectivity_plus · fl_chart**.
 Referensi arsitektur: `../system-design-ekosistem-ekskul-sd.md`
 (bagian 5.1 alur Pembina, 5.2 alur Orang Tua, 6 strategi offline-first).
 
-> **Status: Fase 1.4.** Login + **register Orang Tua** nyata. Mode Pembina:
-> alur Presensi online (1.3). Mode Orang Tua: "Hubungkan ke Anak" + Dashboard
-> perkembangan (donut kehadiran, tren keaktifan, timeline materi) dari
-> `GET /parent/child-progress/{id}` (1.4). Offline sync menyusul di Fase 2.1.
+> **Status: Fase 1.5.** Login/register nyata. Mode Pembina: presensi online (1.3).
+> Mode Orang Tua: "Hubungkan ke Anak" + Dashboard perkembangan (1.4) + **tab
+> Notifikasi dengan badge unread** + registrasi device token saat login (1.5).
+> Offline sync menyusul di Fase 2.1.
 >
 > **Catatan chart:** `fl_chart` dipin ke **^0.69.0** — versi 1.x memanggil
 > `Matrix4.translateByDouble`/`scaleByDouble` yang belum ada di `vector_math`
@@ -43,12 +43,13 @@ lib/
 │   ├── auth/                     # ✅ login + register Orang Tua (POST /auth/login|register)
 │   ├── coach/                    # ✅ MODE PEMBINA — presensi online (Fase 1.3)
 │   │   └── … (TodaySession/Roster/SubmitResult, providers, coach_home + session_page)
-│   └── parent/                   # ✅ MODE ORANG TUA (Fase 1.4)
-│       ├── data/parent_repository.dart   #  map 403 -> UnauthorizedRelationException
-│       ├── domain/entities/              #  Child, ChildProgress, EkskulProgress, …
-│       └── presentation/
-│           ├── providers/               #  children, selectedChild, childProgress.family
-│           └── pages/                   #  parent_home_page (donut/line/timeline), link_child_page
+│   ├── parent/                   # ✅ MODE ORANG TUA (Fase 1.4)
+│   │   └── presentation/pages/   #  parent_shell (bottom nav: Dashboard + Notifikasi),
+│   │                            #  parent_home_page (donut/line/timeline), link_child_page
+│   └── notifications/            # ✅ inbox + unread badge (Fase 1.5)
+│       ├── notifications.dart    #  repo + providers (unreadCount, list) + NotificationItem
+│       └── notifications_page.dart
+├── core/push/device_registration.dart  # ✅ daftar device token ke /notifications/devices saat login
 └── shared/
 ```
 
@@ -126,13 +127,15 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3100/api/v1
 - [x] UI presensi cepat: default Hadir, 1-tap cycle, long-press pilih; tombol besar
 
 ### Fase 1.4
-- [x] Layar "Hubungkan ke Anak" → `POST /parent/link-request` → status
-      "Menunggu persetujuan admin sekolah"
-- [x] Selector anak (>1 anak): ganti anak hanya update `selectedChildProvider` +
-      `childProgressProvider.family` — **tanpa reload aplikasi**
-- [x] Donut chart kehadiran per ekskul + line chart tren keaktifan + timeline materi
-      (`GET /parent/child-progress/{id}`, fl_chart)
-- [x] 403 `UNAUTHORIZED_RELATION` → state informatif ("Menunggu persetujuan admin"),
-      bukan crash/layar putih; ekskul tanpa sesi → pesan "belum ada sesi" — **unit test**
-- [x] `flutter analyze` bersih (0 issue), `flutter test` hijau (8 test)
+- [x] "Hubungkan ke Anak" → `POST /parent/link-request` → "Menunggu persetujuan admin"
+- [x] Selector anak: ganti anak hanya update provider — **tanpa reload aplikasi**
+- [x] Donut/line/timeline dari `GET /parent/child-progress/{id}` (fl_chart)
+- [x] 403 → state informatif; ekskul tanpa sesi → pesan jelas — **unit test**
+
+### Fase 1.5
+- [x] Registrasi device token saat login/register/restore (`POST /notifications/devices`);
+      token stub disimpan di secure storage (seam untuk `firebase_messaging`)
+- [x] Tab Notifikasi (`parent_shell` bottom nav) dengan **badge unread**; tap notifikasi
+      → `POST /notifications/read`; tombol "Tandai semua dibaca"
+- [x] `flutter analyze` bersih (0 issue), `flutter test` hijau (10 test)
 - [ ] `flutter run` di emulator terhadap backend nyata (butuh emulator aktif)
