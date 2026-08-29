@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../providers/auth_providers.dart';
 
@@ -95,6 +96,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                 FilledButton(
                   onPressed: _loading ? null : _submit,
                   child: Text(_loading ? 'Memproses…' : 'Masuk'),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: _loading ? null : () => context.push('/register'),
+                  child: const Text('Orang tua baru? Daftar di sini'),
                 ),
               ],
             ),

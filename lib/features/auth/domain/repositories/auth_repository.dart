@@ -6,6 +6,16 @@ abstract interface class AuthRepository {
   /// POST /auth/login — lihat dokumen desain bagian 4.3.
   Future<AuthSession> login({required String identifier, required String password});
 
+  /// POST /auth/register — pendaftaran mandiri Orang Tua (dokumen desain 5.2).
+  Future<AuthSession> registerParent({
+    required String fullName,
+    required String email,
+    String? phoneNumber,
+    required String password,
+    required String relationType,
+    required bool consent,
+  });
+
   /// POST /auth/refresh
   Future<AuthSession> refresh(String refreshToken);
 

@@ -10,10 +10,14 @@ connectivity_plus · fl_chart**.
 Referensi arsitektur: `../system-design-ekosistem-ekskul-sd.md`
 (bagian 5.1 alur Pembina, 5.2 alur Orang Tua, 6 strategi offline-first).
 
-> **Status: Fase 1.3.** Login nyata (JWT + auto-refresh via interceptor Dio) dan
-> **alur Presensi Pembina (online-only)**: Home "Jadwal Hari Ini" → layar Sesi
-> 2 tab (Presensi cycle-tap + Materi latihan) → `POST /attendance/submit`.
-> Mode Orang Tua masih placeholder (Fase 1.4). Offline sync menyusul di Fase 2.1.
+> **Status: Fase 1.4.** Login + **register Orang Tua** nyata. Mode Pembina:
+> alur Presensi online (1.3). Mode Orang Tua: "Hubungkan ke Anak" + Dashboard
+> perkembangan (donut kehadiran, tren keaktifan, timeline materi) dari
+> `GET /parent/child-progress/{id}` (1.4). Offline sync menyusul di Fase 2.1.
+>
+> **Catatan chart:** `fl_chart` dipin ke **^0.69.0** — versi 1.x memanggil
+> `Matrix4.translateByDouble`/`scaleByDouble` yang belum ada di `vector_math`
+> bawaan Flutter 3.29 (gagal `flutter test`). Naikkan saat upgrade Flutter.
 >
 > **Catatan local DB:** dokumen desain menyebut `sqflite`/`drift`. Untuk sekarang
 > dipakai **sqflite** karena `drift_dev` (codegen) butuh Dart ≥ 3.10 sedangkan
@@ -36,14 +40,15 @@ lib/
 │   ├── theme/app_theme.dart
 │   └── constants/user_role.dart  # PEMBINA | ORANGTUA
 ├── features/
-│   ├── auth/                     # ✅ login nyata (POST /auth/login), restore sesi saat start
+│   ├── auth/                     # ✅ login + register Orang Tua (POST /auth/login|register)
 │   ├── coach/                    # ✅ MODE PEMBINA — presensi online (Fase 1.3)
-│   │   ├── data/                 #    datasource Dio + repository (map 201/409/422)
-│   │   ├── domain/entities/      #    TodaySession, Roster, SubmitResult, AttendanceStatus
-│   │   └── presentation/
-│   │       ├── providers/        #    todaySessions, roster.family, attendanceDrafts
-│   │       └── pages/            #    coach_home_page, session_page (2 tab + submit)
-│   └── parent/                   # MODE ORANG TUA (Fase 1.4 — masih placeholder)
+│   │   └── … (TodaySession/Roster/SubmitResult, providers, coach_home + session_page)
+│   └── parent/                   # ✅ MODE ORANG TUA (Fase 1.4)
+│       ├── data/parent_repository.dart   #  map 403 -> UnauthorizedRelationException
+│       ├── domain/entities/              #  Child, ChildProgress, EkskulProgress, …
+│       └── presentation/
+│           ├── providers/               #  children, selectedChild, childProgress.family
+│           └── pages/                   #  parent_home_page (donut/line/timeline), link_child_page
 └── shared/
 ```
 
@@ -119,5 +124,15 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3100/api/v1
 - [x] Error validasi backend ditandai **per baris siswa** (parse `attendances[i]`),
       bukan pesan generik; auto-pindah ke tab Presensi — **implemented**
 - [x] UI presensi cepat: default Hadir, 1-tap cycle, long-press pilih; tombol besar
-- [x] `flutter analyze` bersih (0 issue), `flutter test` hijau (6 test)
-- [ ] `flutter run` di emulator + submit ke backend nyata (butuh emulator aktif)
+
+### Fase 1.4
+- [x] Layar "Hubungkan ke Anak" → `POST /parent/link-request` → status
+      "Menunggu persetujuan admin sekolah"
+- [x] Selector anak (>1 anak): ganti anak hanya update `selectedChildProvider` +
+      `childProgressProvider.family` — **tanpa reload aplikasi**
+- [x] Donut chart kehadiran per ekskul + line chart tren keaktifan + timeline materi
+      (`GET /parent/child-progress/{id}`, fl_chart)
+- [x] 403 `UNAUTHORIZED_RELATION` → state informatif ("Menunggu persetujuan admin"),
+      bukan crash/layar putih; ekskul tanpa sesi → pesan "belum ada sesi" — **unit test**
+- [x] `flutter analyze` bersih (0 issue), `flutter test` hijau (8 test)
+- [ ] `flutter run` di emulator terhadap backend nyata (butuh emulator aktif)

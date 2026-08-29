@@ -23,6 +23,28 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<AuthSession> registerParent({
+    required String fullName,
+    required String email,
+    String? phoneNumber,
+    required String password,
+    required String relationType,
+    required bool consent,
+  }) async {
+    final data = await _remote.registerParent({
+      'fullName': fullName,
+      'email': email,
+      if (phoneNumber != null && phoneNumber.isNotEmpty) 'phoneNumber': phoneNumber,
+      'password': password,
+      'relationType': relationType,
+      'consent': consent,
+    });
+    final session = _sessionFromLogin(data);
+    await _persist(session);
+    return session;
+  }
+
+  @override
   Future<AuthSession> refresh(String refreshToken) {
     // Rotasi refresh token ditangani di interceptor Dio (core/network/dio_client.dart).
     throw UnimplementedError('Refresh ditangani oleh interceptor Dio.');

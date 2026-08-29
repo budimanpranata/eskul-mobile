@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/providers/auth_providers.dart';
 import '../../features/coach/domain/entities/coach_entities.dart';
 import '../../features/coach/presentation/pages/coach_home_page.dart';
@@ -25,9 +26,10 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: _AuthChangeNotifier(ref),
     redirect: (context, state) {
       final s = session;
-      final atLogin = state.matchedLocation == '/login';
+      final loc = state.matchedLocation;
+      final atPublic = loc == '/login' || loc == '/register';
 
-      if (s == null) return atLogin ? null : '/login';
+      if (s == null) return atPublic ? null : '/login';
 
       // Sudah login: pastikan berada di area sesuai role.
       final home = switch (s.role) {
@@ -35,14 +37,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         UserRole.orangtua => '/parent',
       };
       final inWrongArea = s.role == UserRole.pembina
-          ? state.matchedLocation.startsWith('/parent')
-          : state.matchedLocation.startsWith('/coach');
+          ? loc.startsWith('/parent')
+          : loc.startsWith('/coach');
 
-      if (atLogin || inWrongArea) return home;
+      if (atPublic || inWrongArea) return home;
       return null;
     },
     routes: [
       GoRoute(path: '/login', builder: (_, __) => const LoginPage()),
+      GoRoute(path: '/register', builder: (_, __) => const RegisterPage()),
 
       // --- Mode Pembina ---
       GoRoute(

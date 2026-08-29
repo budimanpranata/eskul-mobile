@@ -17,6 +17,14 @@ class AuthRemoteDataSource {
     return res.data!;
   }
 
+  Future<Map<String, dynamic>> registerParent(Map<String, dynamic> body) async {
+    final res = await _dio.post<Map<String, dynamic>>('/auth/register', data: body);
+    if (res.statusCode != 201) {
+      throw AuthException(_message(res.data) ?? 'Pendaftaran gagal.');
+    }
+    return res.data!;
+  }
+
   Future<void> logout() async {
     await _dio.post('/auth/logout');
   }

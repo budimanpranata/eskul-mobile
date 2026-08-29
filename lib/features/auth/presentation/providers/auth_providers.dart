@@ -38,6 +38,25 @@ class AuthSessionNotifier extends Notifier<AuthSession?> {
     state = session;
   }
 
+  Future<void> registerParent({
+    required String fullName,
+    required String email,
+    String? phoneNumber,
+    required String password,
+    required String relationType,
+    required bool consent,
+  }) async {
+    final session = await ref.read(authRepositoryProvider).registerParent(
+          fullName: fullName,
+          email: email,
+          phoneNumber: phoneNumber,
+          password: password,
+          relationType: relationType,
+          consent: consent,
+        );
+    state = session;
+  }
+
   Future<void> logout() async {
     await ref.read(authRepositoryProvider).logout();
     state = null;
