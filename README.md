@@ -10,10 +10,10 @@ connectivity_plus · fl_chart**.
 Referensi arsitektur: `../system-design-ekosistem-ekskul-sd.md`
 (bagian 5.1 alur Pembina, 5.2 alur Orang Tua, 6 strategi offline-first).
 
-> **Status: Fase 2.2.** Mode Pembina: presensi **offline-first** (2.1: autosave SQLite,
-> submit offline → PENDING_SYNC → SyncEngine auto-sync, backoff 1s/2s/4s, cache roster
-> 14 hari, Riwayat Sesi) + **Scan QR kartu siswa** (2.2: `mobile_scanner`, scan beruntun
-> → set HADIR + haptic/suara). Mode Orang Tua: Dashboard + tab Notifikasi (1.4/1.5).
+> **Status: Fase 2.3.** Mode Pembina: presensi **offline-first** (2.1) + **Scan QR**
+> (2.2) + **nilai keaktifan & catatan personal per siswa** (2.3: long-press → bottom
+> sheet, skor 1–5 khusus HADIR, rata-rata di Riwayat Sesi). Mode Orang Tua: Dashboard
+> + tab Notifikasi (1.4/1.5).
 >
 > **Catatan chart:** `fl_chart` dipin ke **^0.69.0** — versi 1.x memanggil
 > `Matrix4.translateByDouble`/`scaleByDouble` yang belum ada di `vector_math`
@@ -160,5 +160,11 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3100/api/v1
       HapticFeedback + SystemSound + overlay hijau (dominasi latensi = jaringan) — **unit test resolveQr**
 - [x] `qr_token` tidak valid / bukan anggota → overlay merah + haptic, **bukan silent fail** — **unit test**
 - [x] Izin kamera: AndroidManifest `CAMERA`, iOS `NSCameraUsageDescription`
-- [x] `flutter analyze` bersih (0 issue), `flutter test` hijau (22 test)
+
+### Fase 2.3
+- [x] Long-press nama siswa → bottom sheet: status + skor keaktifan 1–5 + `skill_notes` + `personal_notes`
+- [x] Input keaktifan **opsional** (tidak wajib per siswa) — tap tetap cycle status, alur utama tak melambat
+- [x] Skor dinonaktifkan bila status ≠ HADIR; payload hanya kirim `activeness_score` saat HADIR (cegah 422)
+- [x] Rata-rata keaktifan sesi di layar Riwayat Sesi (dihitung dari payload lokal)
+- [x] `flutter analyze` bersih (0 issue), `flutter test` hijau (25 test)
 - [ ] `flutter run` di emulator terhadap backend nyata (butuh emulator aktif)
