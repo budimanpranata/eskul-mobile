@@ -1,14 +1,23 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:eskul_mobile/app.dart';
+import 'package:eskul_mobile/features/auth/presentation/providers/auth_providers.dart';
 
 void main() {
-  testWidgets('Aplikasi menampilkan layar login saat belum ada sesi', (tester) async {
-    await tester.pumpWidget(const ProviderScope(child: EskulApp()));
+  testWidgets('Tanpa sesi → menampilkan form login (email + password)', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        // secure storage tidak tersedia di test env → lewati pemulihan sesi.
+        overrides: [sessionRestoreProvider.overrideWith((ref) async {})],
+        child: const EskulApp(),
+      ),
+    );
     await tester.pumpAndSettle();
 
-    expect(find.text('Masuk sebagai Pembina'), findsOneWidget);
-    expect(find.text('Masuk sebagai Orang Tua'), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'Email / No. HP'), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'Password'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Masuk'), findsOneWidget);
   });
 }

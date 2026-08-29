@@ -8,7 +8,9 @@ class AppConfig {
   /// Base URL API backend (bagian 4 dokumen desain).
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:3000/api/v1', // 10.0.2.2 = localhost host dari emulator Android
+    // 10.0.2.2 = localhost mesin host dilihat dari emulator Android.
+    // Port 3100 = default backend dev (lihat backend/.env.example).
+    defaultValue: 'http://10.0.2.2:3100/api/v1',
   );
 
   /// Timeout default request (ms).

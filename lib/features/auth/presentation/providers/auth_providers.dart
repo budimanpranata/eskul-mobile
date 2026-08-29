@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/dio_client.dart';
@@ -7,24 +8,40 @@ import '../../data/repositories/auth_repository_impl.dart';
 import '../../domain/entities/auth_session.dart';
 import '../../domain/repositories/auth_repository.dart';
 
-/// Wiring dependency (Riverpod) untuk fitur auth.
-
 final secureStorageProvider = Provider<SecureStorage>((ref) => SecureStorage());
+
+/// Dio bersama untuk seluruh aplikasi (interceptor auth + auto-refresh).
+final dioProvider = Provider<Dio>((ref) {
+  final storage = ref.watch(secureStorageProvider);
+  return createDioClient(
+    storage,
+    onAuthFailure: () => ref.read(authSessionProvider.notifier).clear(),
+  );
+});
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepositoryImpl(
-    remote: AuthRemoteDataSource(createDioClient()),
+    remote: AuthRemoteDataSource(ref.watch(dioProvider)),
     storage: ref.watch(secureStorageProvider),
   );
 });
 
 /// Sesi auth aktif. `null` = belum login.
-///
-/// FASE 0: hanya di-set manual (simulasi role di LoginPage).
-/// Di Fase 1.1 diisi lewat pemanggilan [AuthRepository.login] / restoreSession().
 class AuthSessionNotifier extends Notifier<AuthSession?> {
   @override
   AuthSession? build() => null;
+
+  Future<void> login(String identifier, String password) async {
+    final session = await ref
+        .read(authRepositoryProvider)
+        .login(identifier: identifier, password: password);
+    state = session;
+  }
+
+  Future<void> logout() async {
+    await ref.read(authRepositoryProvider).logout();
+    state = null;
+  }
 
   void setSession(AuthSession session) => state = session;
   void clear() => state = null;
@@ -32,3 +49,11 @@ class AuthSessionNotifier extends Notifier<AuthSession?> {
 
 final authSessionProvider =
     NotifierProvider<AuthSessionNotifier, AuthSession?>(AuthSessionNotifier.new);
+
+/// Dijalankan sekali saat aplikasi dibuka: pulihkan sesi dari secure storage.
+final sessionRestoreProvider = FutureProvider<void>((ref) async {
+  final restored = await ref.read(authRepositoryProvider).restoreSession();
+  if (restored != null) {
+    ref.read(authSessionProvider.notifier).setSession(restored);
+  }
+});

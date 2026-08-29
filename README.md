@@ -10,8 +10,10 @@ connectivity_plus · fl_chart**.
 Referensi arsitektur: `../system-design-ekosistem-ekskul-sd.md`
 (bagian 5.1 alur Pembina, 5.2 alur Orang Tua, 6 strategi offline-first).
 
-> **Status: Fase 0 (scaffolding).** Struktur clean architecture, routing dua-mode,
-> dan kerangka local DB sudah terpasang. Semua halaman placeholder.
+> **Status: Fase 1.3.** Login nyata (JWT + auto-refresh via interceptor Dio) dan
+> **alur Presensi Pembina (online-only)**: Home "Jadwal Hari Ini" → layar Sesi
+> 2 tab (Presensi cycle-tap + Materi latihan) → `POST /attendance/submit`.
+> Mode Orang Tua masih placeholder (Fase 1.4). Offline sync menyusul di Fase 2.1.
 >
 > **Catatan local DB:** dokumen desain menyebut `sqflite`/`drift`. Untuk sekarang
 > dipakai **sqflite** karena `drift_dev` (codegen) butuh Dart ≥ 3.10 sedangkan
@@ -26,24 +28,39 @@ lib/
 ├── app.dart                      # MaterialApp.router
 ├── core/
 │   ├── config/app_config.dart    # base URL API via --dart-define
-│   ├── network/dio_client.dart   # factory Dio (interceptor auth -> Fase 1)
+│   ├── network/dio_client.dart   # ✅ Dio + interceptor: Bearer + auto-refresh saat 401
 │   ├── storage/
-│   │   ├── secure_storage.dart   # token access/refresh
+│   │   ├── secure_storage.dart   # token access/refresh + metadata sesi (id/nama/role)
 │   │   └── local_database.dart   # sqflite: pending_sessions, cached_rosters (Fase 2.1)
 │   ├── router/app_router.dart    # go_router + redirect berbasis role
 │   ├── theme/app_theme.dart
 │   └── constants/user_role.dart  # PEMBINA | ORANGTUA
 ├── features/
-│   ├── auth/
-│   │   ├── data/                 # datasources + repositories (impl)
-│   │   ├── domain/               # entities + repository interface
-│   │   └── presentation/         # pages + providers (Riverpod)
-│   ├── coach/                    # MODE PEMBINA
-│   │   └── presentation/pages/   # coach_home_page, session_page (2 tab)
-│   └── parent/                   # MODE ORANG TUA
-│       └── presentation/pages/   # parent_home_page, link_child_page
-└── shared/                       # widgets & model lintas-fitur
+│   ├── auth/                     # ✅ login nyata (POST /auth/login), restore sesi saat start
+│   ├── coach/                    # ✅ MODE PEMBINA — presensi online (Fase 1.3)
+│   │   ├── data/                 #    datasource Dio + repository (map 201/409/422)
+│   │   ├── domain/entities/      #    TodaySession, Roster, SubmitResult, AttendanceStatus
+│   │   └── presentation/
+│   │       ├── providers/        #    todaySessions, roster.family, attendanceDrafts
+│   │       └── pages/            #    coach_home_page, session_page (2 tab + submit)
+│   └── parent/                   # MODE ORANG TUA (Fase 1.4 — masih placeholder)
+└── shared/
 ```
+
+### Alur Presensi Pembina (Fase 1.3)
+
+1. **Home** — `GET /coach/today-sessions`: kartu jadwal ekskul hari ini; badge
+   "Sudah disubmit" bila sesi hari itu sudah ada.
+2. **Sesi** — `GET /coach/extracurriculars/:id/roster`; Tab *Presensi Cepat*:
+   semua default **Hadir**, tap nama = siklus Hadir→Izin→Sakit→Alpa, long-press =
+   pilih langsung. Tab *Materi*: deskripsi + durasi (stepper ±5) + target.
+3. **Submit** — `POST /attendance/submit`. `client_generated_id` (UUID v4) dibuat
+   **saat draft pertama dibuka** dan dipakai ulang selama sesi belum terkirim
+   (`attendanceDraftsProvider`, hidup sepanjang app); di-*clear* setelah sukses.
+4. Sukses → snackbar ringkasan (X hadir, Y izin, …). **422** → error ditandai per
+   baris siswa + pindah ke tab Presensi. **409** → "sudah pernah disubmit".
+
+> Persistensi `client_generated_id` lintas *restart* aplikasi butuh local DB → Fase 2.1.
 
 Tiap fitur mengikuti pembagian `data / domain / presentation`. Fitur `auth`
 sudah berisi kerangka ketiga layer sebagai contoh pola; fitur lain diisi
@@ -60,9 +77,9 @@ mengarahkan:
 | `ORANGTUA` | `/parent` |
 | belum login | `/login` |
 
-Di Fase 0, `LoginPage` menyediakan dua tombol simulasi role agar navigasi bisa
-ditinjau tanpa backend. Simulasi ini dicabut di Fase 1.1 (diganti panggilan
-`POST /auth/login`).
+`LoginPage` memanggil `POST /auth/login` sungguhan (identifier + password).
+Sesi (token + id/nama/role) disimpan di `flutter_secure_storage` dan dipulihkan
+saat aplikasi dibuka (`sessionRestoreProvider`). Backend menegakkan RBAC per role.
 
 ## Menjalankan secara lokal
 
@@ -72,10 +89,11 @@ ditinjau tanpa backend. Simulasi ini dicabut di Fase 1.1 (diganti panggilan
 
 ```bash
 flutter pub get
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000/api/v1
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3100/api/v1
 ```
 
 - `10.0.2.2` = alamat `localhost` mesin host dilihat dari emulator Android.
+- Backend dev berjalan di port **3100** (lihat `backend/.env.example`).
 - Untuk perangkat fisik, ganti dengan IP LAN mesin yang menjalankan `eskul-backend`.
 - Tanpa `--dart-define`, dipakai default di `app_config.dart`.
 
@@ -87,10 +105,19 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000/api/v1
 | `flutter test` | Jalankan widget/unit test |
 | `flutter build apk --debug` | Build APK debug |
 
-## Definition of Done (Fase 0.1)
+## Definition of Done
 
+### Fase 0.1
 - [x] `flutter analyze` bersih, `flutter test` hijau
 - [x] Struktur clean architecture (data/domain/presentation) terbentuk
 - [x] Routing 2 mode (Pembina/Orang Tua) berdasarkan role
 - [x] Local database (sqflite) di-setup sebagai kerangka offline
-- [ ] `flutter run` diverifikasi di emulator (butuh emulator aktif)
+
+### Fase 1.3
+- [x] `client_generated_id` konsisten dipakai ulang saat sesi draft dibuka ulang;
+      id baru hanya setelah `clear` (submit sukses) — **unit test**
+- [x] Error validasi backend ditandai **per baris siswa** (parse `attendances[i]`),
+      bukan pesan generik; auto-pindah ke tab Presensi — **implemented**
+- [x] UI presensi cepat: default Hadir, 1-tap cycle, long-press pilih; tombol besar
+- [x] `flutter analyze` bersih (0 issue), `flutter test` hijau (6 test)
+- [ ] `flutter run` di emulator + submit ke backend nyata (butuh emulator aktif)

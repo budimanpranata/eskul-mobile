@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/providers/auth_providers.dart';
+import '../../features/coach/domain/entities/coach_entities.dart';
 import '../../features/coach/presentation/pages/coach_home_page.dart';
 import '../../features/coach/presentation/pages/session_page.dart';
 import '../../features/parent/presentation/pages/link_child_page.dart';
@@ -50,7 +51,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: 'session/:id',
-            builder: (_, state) => SessionPage(sessionId: state.pathParameters['id']!),
+            builder: (_, state) => SessionPage(
+              extracurricularId: state.pathParameters['id']!,
+              session: state.extra is TodaySession ? state.extra as TodaySession : null,
+            ),
           ),
         ],
       ),
