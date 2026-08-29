@@ -10,10 +10,11 @@ connectivity_plus · fl_chart**.
 Referensi arsitektur: `../system-design-ekosistem-ekskul-sd.md`
 (bagian 5.1 alur Pembina, 5.2 alur Orang Tua, 6 strategi offline-first).
 
-> **Status: Fase 2.3.** Mode Pembina: presensi **offline-first** (2.1) + **Scan QR**
-> (2.2) + **nilai keaktifan & catatan personal per siswa** (2.3: long-press → bottom
-> sheet, skor 1–5 khusus HADIR, rata-rata di Riwayat Sesi). Mode Orang Tua: Dashboard
-> + tab Notifikasi (1.4/1.5).
+> **Status: Fase 3.2 (bagian mobile).** Mode Pembina: presensi **offline-first** (2.1)
+> + **Scan QR** (2.2) + **nilai keaktifan & catatan personal per siswa** (2.3).
+> Mode Orang Tua: Dashboard + tab Notifikasi (1.4/1.5) + **tren keaktifan dengan
+> toggle Mingguan/Bulanan** (3.2: agregasi backend per minggu/bulan, `fl_chart`,
+> aman untuk data minim 1 titik).
 >
 > **Catatan chart:** `fl_chart` dipin ke **^0.69.0** — versi 1.x memanggil
 > `Matrix4.translateByDouble`/`scaleByDouble` yang belum ada di `vector_math`
@@ -168,3 +169,12 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3100/api/v1
 - [x] Rata-rata keaktifan sesi di layar Riwayat Sesi (dihitung dari payload lokal)
 - [x] `flutter analyze` bersih (0 issue), `flutter test` hijau (25 test)
 - [ ] `flutter run` di emulator terhadap backend nyata (butuh emulator aktif)
+
+### Fase 3.2 (bagian mobile — Orang Tua)
+- [x] Dashboard: `SegmentedButton` **Mingguan / Bulanan** → mengganti param `period`
+      pada `childProgressProvider((studentId, period))` sehingga refetch
+- [x] `_ActivenessCard` menggambar `activeness_trend` hasil agregasi backend
+      (`{ bucket, label, avg_score, sessions }`), sumbu-X pakai `label`, kurva
+      dimatikan bila < 3 titik agar tetap terbaca
+- [x] Edge case data minim: 1 titik pun tidak error (fl_chart tetap menggambar dot)
+- [x] `flutter analyze` bersih, `flutter test` hijau (25 test)

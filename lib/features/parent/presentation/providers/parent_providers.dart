@@ -23,7 +23,21 @@ class SelectedChildNotifier extends Notifier<String?> {
 final selectedChildProvider =
     NotifierProvider<SelectedChildNotifier, String?>(SelectedChildNotifier.new);
 
+/// Toggle periode tren keaktifan pada dashboard ortu (Fase 3.2).
+class TrendPeriodNotifier extends Notifier<String> {
+  @override
+  String build() => 'weekly';
+  void set(String period) => state = period;
+}
+
+final trendPeriodProvider =
+    NotifierProvider<TrendPeriodNotifier, String>(TrendPeriodNotifier.new);
+
+typedef ChildProgressArgs = ({String studentId, String period});
+
 final childProgressProvider =
-    FutureProvider.autoDispose.family<ChildProgress, String>((ref, studentId) {
-  return ref.watch(parentRepositoryProvider).childProgress(studentId);
+    FutureProvider.autoDispose.family<ChildProgress, ChildProgressArgs>((ref, args) {
+  return ref
+      .watch(parentRepositoryProvider)
+      .childProgress(args.studentId, period: args.period);
 });

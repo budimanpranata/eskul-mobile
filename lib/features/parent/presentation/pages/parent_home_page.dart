@@ -92,10 +92,12 @@ class _ProgressView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final progressAsync = ref.watch(childProgressProvider(child.id));
+    final period = ref.watch(trendPeriodProvider);
+    final args = (studentId: child.id, period: period);
+    final progressAsync = ref.watch(childProgressProvider(args));
 
     return RefreshIndicator(
-      onRefresh: () async => ref.refresh(childProgressProvider(child.id).future),
+      onRefresh: () async => ref.refresh(childProgressProvider(args).future),
       child: progressAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) {
@@ -129,13 +131,21 @@ class _ProgressView extends ConsumerWidget {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              Align(
+                alignment: Alignment.centerRight,
+                child: _PeriodToggle(
+                  period: period,
+                  onChanged: (v) => ref.read(trendPeriodProvider.notifier).set(v),
+                ),
+              ),
+              const SizedBox(height: 8),
               for (final ek in p.extracurriculars) ...[
                 Text(ek.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 8),
                 _DonutCard(summary: ek.summary),
                 if (ek.activenessTrend.isNotEmpty) ...[
                   const SizedBox(height: 12),
-                  _ActivenessCard(points: ek.activenessTrend),
+                  _ActivenessCard(points: ek.activenessTrend, period: period),
                 ],
                 if (ek.materials.isNotEmpty) ...[
                   const SizedBox(height: 12),
@@ -200,40 +210,87 @@ class _DonutCard extends StatelessWidget {
   }
 }
 
+class _PeriodToggle extends StatelessWidget {
+  const _PeriodToggle({required this.period, required this.onChanged});
+  final String period;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SegmentedButton<String>(
+      showSelectedIcon: false,
+      style: const ButtonStyle(visualDensity: VisualDensity.compact),
+      segments: const [
+        ButtonSegment(value: 'weekly', label: Text('Mingguan')),
+        ButtonSegment(value: 'monthly', label: Text('Bulanan')),
+      ],
+      selected: {period},
+      onSelectionChanged: (s) => onChanged(s.first),
+    );
+  }
+}
+
 class _ActivenessCard extends StatelessWidget {
-  const _ActivenessCard({required this.points});
+  const _ActivenessCard({required this.points, required this.period});
   final List<ActivenessPoint> points;
+  final String period;
 
   @override
   Widget build(BuildContext context) {
     final spots = [
-      for (var i = 0; i < points.length; i++) FlSpot(i.toDouble(), points[i].score.toDouble()),
+      for (var i = 0; i < points.length; i++) FlSpot(i.toDouble(), points[i].avgScore),
     ];
+    final unit = period == 'monthly' ? 'per bulan' : 'per minggu';
+    // Interval label sumbu-X: jarangkan bila titik banyak agar tidak tumpang tindih.
+    final labelEvery = (points.length / 4).ceil().clamp(1, points.length);
     return Card(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 16, 16, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Tren keaktifan (1–5)', style: TextStyle(fontWeight: FontWeight.w600)),
+            Text('Tren keaktifan (1–5) $unit',
+                style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
             SizedBox(
-              height: 140,
+              height: 150,
               child: LineChart(
                 LineChartData(
                   minY: 0,
                   maxY: 5,
+                  minX: 0,
+                  maxX: (points.length - 1).toDouble().clamp(0, double.infinity),
                   gridData: const FlGridData(show: true, drawVerticalLine: false),
-                  titlesData: const FlTitlesData(
-                    topTitles: AxisTitles(),
-                    rightTitles: AxisTitles(),
-                    bottomTitles: AxisTitles(),
+                  titlesData: FlTitlesData(
+                    topTitles: const AxisTitles(),
+                    rightTitles: const AxisTitles(),
+                    leftTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: true, reservedSize: 24, interval: 1),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 28,
+                        interval: 1,
+                        getTitlesWidget: (value, meta) {
+                          final i = value.round();
+                          if (i < 0 || i >= points.length || i % labelEvery != 0) {
+                            return const SizedBox.shrink();
+                          }
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(points[i].label,
+                                style: const TextStyle(fontSize: 10, color: Colors.black54)),
+                          );
+                        },
+                      ),
+                    ),
                   ),
                   borderData: FlBorderData(show: false),
                   lineBarsData: [
                     LineChartBarData(
                       spots: spots,
-                      isCurved: true,
+                      isCurved: points.length > 2,
                       barWidth: 3,
                       color: const Color(0xFF1E6F5C),
                       dotData: const FlDotData(show: true),

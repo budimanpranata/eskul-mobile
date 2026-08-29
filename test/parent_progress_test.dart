@@ -19,8 +19,8 @@ void main() {
             'percentage': 75.0,
           },
           'activeness_trend': [
-            {'date': '2026-08-04', 'score': 4},
-            {'date': '2026-08-11', 'score': 5},
+            {'bucket': '2026-08-03', 'label': '3 Agu', 'avg_score': 4.0, 'sessions': 2},
+            {'bucket': '2026-08-10', 'label': '10 Agu', 'avg_score': 5.0, 'sessions': 1},
           ],
           'materials_timeline': [
             {
@@ -42,7 +42,9 @@ void main() {
     final ek = p.extracurriculars.single;
     expect(ek.summary.percentage, 75.0);
     expect(ek.summary.hadir, 3);
-    expect(ek.activenessTrend.map((a) => a.score), [4, 5]);
+    expect(ek.activenessTrend.map((a) => a.avgScore), [4.0, 5.0]);
+    expect(ek.activenessTrend.map((a) => a.label), ['3 Agu', '10 Agu']);
+    expect(ek.activenessTrend.first.sessions, 2);
     expect(ek.materials.single.coachName, 'Pak Budi');
     expect(p.latestNotificationAt, '2026-08-11T16:40:00+07:00');
   });

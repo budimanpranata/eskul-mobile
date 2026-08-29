@@ -45,13 +45,23 @@ class AttendanceSummary {
       );
 }
 
+/// Satu titik tren keaktifan, sudah diagregasi backend per minggu / bulan (Fase 3.2).
 class ActivenessPoint {
-  const ActivenessPoint({required this.date, required this.score});
-  final String date;
-  final int score;
+  const ActivenessPoint({
+    required this.label,
+    required this.avgScore,
+    required this.sessions,
+  });
 
-  factory ActivenessPoint.fromJson(Map<String, dynamic> j) =>
-      ActivenessPoint(date: j['date'] as String, score: (j['score'] as num).toInt());
+  final String label;
+  final double avgScore;
+  final int sessions;
+
+  factory ActivenessPoint.fromJson(Map<String, dynamic> j) => ActivenessPoint(
+        label: (j['label'] ?? j['bucket'] ?? '') as String,
+        avgScore: (j['avg_score'] as num).toDouble(),
+        sessions: (j['sessions'] as num?)?.toInt() ?? 0,
+      );
 }
 
 class MaterialEntry {
