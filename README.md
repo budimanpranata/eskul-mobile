@@ -10,10 +10,10 @@ connectivity_plus · fl_chart**.
 Referensi arsitektur: `../system-design-ekosistem-ekskul-sd.md`
 (bagian 5.1 alur Pembina, 5.2 alur Orang Tua, 6 strategi offline-first).
 
-> **Status: Fase 2.1.** Login/register nyata. Mode Pembina: presensi **offline-first**
-> (draft autosave ke SQLite, submit offline → PENDING_SYNC → SyncEngine auto-sync
-> saat online, backoff 1s/2s/4s, idempoten via `client_generated_id`, cache roster
-> 14 hari, layar Riwayat Sesi). Mode Orang Tua: Dashboard + tab Notifikasi (1.4/1.5).
+> **Status: Fase 2.2.** Mode Pembina: presensi **offline-first** (2.1: autosave SQLite,
+> submit offline → PENDING_SYNC → SyncEngine auto-sync, backoff 1s/2s/4s, cache roster
+> 14 hari, Riwayat Sesi) + **Scan QR kartu siswa** (2.2: `mobile_scanner`, scan beruntun
+> → set HADIR + haptic/suara). Mode Orang Tua: Dashboard + tab Notifikasi (1.4/1.5).
 >
 > **Catatan chart:** `fl_chart` dipin ke **^0.69.0** — versi 1.x memanggil
 > `Matrix4.translateByDouble`/`scaleByDouble` yang belum ada di `vector_math`
@@ -153,5 +153,12 @@ flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3100/api/v1
       yang sama, 409 → SYNCED tanpa error — **unit test** (backend UNIQUE terverifikasi di Fase 1.3)
 - [x] Cache roster lokal terhapus otomatis setelah 14 hari (`RosterCache.get`/`purgeExpired`) — **unit test**
 - [x] Badge status Draft/Pending Sync/Synced di layar Riwayat Sesi
-- [x] `flutter analyze` bersih (0 issue), `flutter test` hijau (18 test)
+
+### Fase 2.2
+- [x] Tombol floating "Scan QR" di layar Presensi → kamera (`mobile_scanner`)
+- [x] Scan valid → `POST /coach/students/qr-scan` → set **HADIR** di draft +
+      HapticFeedback + SystemSound + overlay hijau (dominasi latensi = jaringan) — **unit test resolveQr**
+- [x] `qr_token` tidak valid / bukan anggota → overlay merah + haptic, **bukan silent fail** — **unit test**
+- [x] Izin kamera: AndroidManifest `CAMERA`, iOS `NSCameraUsageDescription`
+- [x] `flutter analyze` bersih (0 issue), `flutter test` hijau (22 test)
 - [ ] `flutter run` di emulator terhadap backend nyata (butuh emulator aktif)
