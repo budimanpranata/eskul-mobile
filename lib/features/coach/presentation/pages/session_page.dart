@@ -293,64 +293,105 @@ class _PresenceTab extends ConsumerWidget {
     AttendanceStatus.alpa: Color(0xFFB0402F),
   };
 
+  void _openEval(
+    BuildContext context,
+    RosterStudent st,
+    AttendanceStatus status,
+    StudentEval? ev,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _EvalSheet(
+        ekskulId: ekskulId,
+        student: st,
+        status: status,
+        eval: ev ?? const StudentEval(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final draft = ref.watch(attendanceDraftsProvider)[ekskulId];
     final notifier = ref.read(attendanceDraftsProvider.notifier);
 
-    return ListView.separated(
-      itemCount: students.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
-      itemBuilder: (_, i) {
-        final st = students[i];
-        final status = draft?.statuses[st.id] ?? AttendanceStatus.hadir;
-        final ev = draft?.evals[st.id];
-        final err = rowErrors[i];
-        return ListTile(
-          onTap: () => notifier.cycle(ekskulId, st.id),
-          onLongPress: () => showModalBottomSheet<void>(
-            context: context,
-            isScrollControlled: true,
-            builder: (_) => _EvalSheet(
-              ekskulId: ekskulId,
-              student: st,
-              status: status,
-              eval: ev ?? const StudentEval(),
-            ),
+    return Column(
+      children: [
+        Container(
+          width: double.infinity,
+          color: const Color(0xFFEEF3F1),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: const Text(
+            'Ketuk baris untuk ubah status kehadiran. Ketuk tombol "Nilai" '
+            'untuk memberi nilai keaktifan (1–5) & catatan tiap siswa.',
+            style: TextStyle(fontSize: 12, color: Color(0xFF3E5C54)),
           ),
-          leading: CircleAvatar(child: Text(st.fullName.characters.first)),
-          title: Text(st.fullName),
-          subtitle: Text(err ?? '${st.classGrade} · ${st.nis}',
-              style: err != null ? const TextStyle(color: Colors.red) : null),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (ev != null && !ev.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: Icon(
-                    ev.activenessScore != null ? Icons.star : Icons.sticky_note_2_outlined,
-                    size: 18,
-                    color: Colors.amber.shade700,
-                  ),
+        ),
+        Expanded(
+          child: ListView.separated(
+            itemCount: students.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (_, i) {
+              final st = students[i];
+              final status = draft?.statuses[st.id] ?? AttendanceStatus.hadir;
+              final ev = draft?.evals[st.id];
+              final err = rowErrors[i];
+              return ListTile(
+                onTap: () => notifier.cycle(ekskulId, st.id),
+                onLongPress: () => _openEval(context, st, status, ev),
+                leading: CircleAvatar(child: Text(st.fullName.characters.first)),
+                title: Text(st.fullName),
+                subtitle: Text(err ?? '${st.classGrade} · ${st.nis}',
+                    style: err != null ? const TextStyle(color: Colors.red) : null),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                      decoration: BoxDecoration(
+                          color: _colors[status], borderRadius: BorderRadius.circular(20)),
+                      child: Text(status.label,
+                          style:
+                              const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                    ),
+                    const SizedBox(width: 4),
+                    // Tombol eksplisit untuk beri nilai & catatan per siswa.
+                    TextButton.icon(
+                      onPressed: () => _openEval(context, st, status, ev),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: const Size(0, 36),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      icon: Icon(
+                        ev?.activenessScore != null
+                            ? Icons.star
+                            : (ev != null && !ev.isEmpty)
+                                ? Icons.sticky_note_2
+                                : Icons.star_border,
+                        size: 18,
+                        color: ev != null && !ev.isEmpty
+                            ? Colors.amber.shade800
+                            : Colors.grey.shade600,
+                      ),
+                      label: Text(
+                        ev?.activenessScore != null ? '${ev!.activenessScore}' : 'Nilai',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: ev != null && !ev.isEmpty
+                              ? Colors.amber.shade900
+                              : Colors.grey.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              if (ev?.activenessScore != null)
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: Text('${ev!.activenessScore}',
-                      style: const TextStyle(fontWeight: FontWeight.bold)),
-                ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration:
-                    BoxDecoration(color: _colors[status], borderRadius: BorderRadius.circular(20)),
-                child: Text(status.label,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-              ),
-            ],
+              );
+            },
           ),
-        );
-      },
+        ),
+      ],
     );
   }
 }
