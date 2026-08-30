@@ -6,7 +6,7 @@ import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/providers/auth_providers.dart';
 import '../../features/coach/domain/entities/coach_entities.dart';
-import '../../features/coach/presentation/pages/coach_home_page.dart';
+import '../../features/coach/presentation/pages/coach_shell.dart';
 import '../../features/coach/presentation/pages/session_history_page.dart';
 import '../../features/coach/presentation/pages/session_page.dart';
 import '../../features/parent/presentation/pages/link_child_page.dart';
@@ -51,7 +51,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       // --- Mode Pembina ---
       GoRoute(
         path: '/coach',
-        builder: (_, __) => const CoachHomePage(),
+        builder: (_, __) => const CoachShell(),
         routes: [
           GoRoute(
             path: 'history',

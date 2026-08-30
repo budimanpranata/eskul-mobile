@@ -79,6 +79,14 @@ class AuthSessionNotifier extends Notifier<AuthSession?> {
 final authSessionProvider =
     NotifierProvider<AuthSessionNotifier, AuthSession?>(AuthSessionNotifier.new);
 
+/// Profil pengguna login (`GET /auth/me`) — email, no. HP, dsb. untuk layar Profil.
+final authMeProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+  // Ikut daur ulang saat sesi berganti.
+  ref.watch(authSessionProvider);
+  final res = await ref.watch(dioProvider).get<Map<String, dynamic>>('/auth/me');
+  return res.data ?? const {};
+});
+
 /// Dijalankan sekali saat aplikasi dibuka: pulihkan sesi dari secure storage.
 final sessionRestoreProvider = FutureProvider<void>((ref) async {
   final restored = await ref.read(authRepositoryProvider).restoreSession();
