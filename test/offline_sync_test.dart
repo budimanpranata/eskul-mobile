@@ -71,6 +71,16 @@ class FakeRemote implements CoachRemoteDataSource {
 
   @override
   Future<Map<String, dynamic>> todaySessions() async => {'date': '', 'dayLabel': '', 'sessions': []};
+
+  @override
+  Future<Map<String, dynamic>> summary() async => {
+        'dayLabel': '',
+        'totalStudents': 0,
+        'totalExtracurriculars': 0,
+        'weeklySchedules': 0,
+        'todaySessionCount': 0,
+        'pendingSubmitToday': 0,
+      };
 }
 
 Map<String, dynamic> _payload(String cgid) => {

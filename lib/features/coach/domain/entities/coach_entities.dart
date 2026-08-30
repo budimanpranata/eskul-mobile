@@ -55,6 +55,34 @@ class TodaySession {
       );
 }
 
+/// Angka ringkas untuk dashboard Pembina (GET /coach/summary).
+class CoachSummary {
+  const CoachSummary({
+    required this.dayLabel,
+    required this.totalStudents,
+    required this.totalExtracurriculars,
+    required this.weeklySchedules,
+    required this.todaySessionCount,
+    required this.pendingSubmitToday,
+  });
+
+  final String dayLabel;
+  final int totalStudents;
+  final int totalExtracurriculars;
+  final int weeklySchedules;
+  final int todaySessionCount;
+  final int pendingSubmitToday;
+
+  factory CoachSummary.fromJson(Map<String, dynamic> j) => CoachSummary(
+        dayLabel: (j['dayLabel'] as String?) ?? '',
+        totalStudents: (j['totalStudents'] as num?)?.toInt() ?? 0,
+        totalExtracurriculars: (j['totalExtracurriculars'] as num?)?.toInt() ?? 0,
+        weeklySchedules: (j['weeklySchedules'] as num?)?.toInt() ?? 0,
+        todaySessionCount: (j['todaySessionCount'] as num?)?.toInt() ?? 0,
+        pendingSubmitToday: (j['pendingSubmitToday'] as num?)?.toInt() ?? 0,
+      );
+}
+
 class TodaySessionsResult {
   const TodaySessionsResult({required this.date, required this.dayLabel, required this.sessions});
   final String date;

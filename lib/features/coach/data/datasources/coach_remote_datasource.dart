@@ -4,6 +4,12 @@ class CoachRemoteDataSource {
   CoachRemoteDataSource(this._dio);
   final Dio _dio;
 
+  Future<Map<String, dynamic>> summary() async {
+    final r = await _dio.get<Map<String, dynamic>>('/coach/summary');
+    _ensureOk(r);
+    return r.data!;
+  }
+
   Future<Map<String, dynamic>> todaySessions() async {
     final r = await _dio.get<Map<String, dynamic>>('/coach/today-sessions');
     _ensureOk(r);

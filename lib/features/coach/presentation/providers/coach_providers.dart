@@ -51,6 +51,10 @@ final syncSchedulerProvider = Provider<void>((ref) {
   });
 });
 
+final coachSummaryProvider = FutureProvider.autoDispose<CoachSummary>((ref) {
+  return ref.watch(coachRepositoryProvider).coachSummary();
+});
+
 final todaySessionsProvider = FutureProvider.autoDispose<TodaySessionsResult>((ref) {
   return ref.watch(coachRepositoryProvider).todaySessions();
 });

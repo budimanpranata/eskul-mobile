@@ -35,6 +35,16 @@ class _FakeRepo implements CoachRepository {
   }
 
   @override
+  Future<CoachSummary> coachSummary() async => const CoachSummary(
+        dayLabel: 'Minggu',
+        totalStudents: 2,
+        totalExtracurriculars: 1,
+        weeklySchedules: 1,
+        todaySessionCount: 0,
+        pendingSubmitToday: 0,
+      );
+
+  @override
   Future<TodaySessionsResult> todaySessions() async =>
       const TodaySessionsResult(date: '2026-08-30', dayLabel: 'Minggu', sessions: []);
 

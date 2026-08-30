@@ -3,6 +3,9 @@ import '../entities/coach_entities.dart';
 
 /// Kontrak fitur Pembina — offline-first sejak Fase 2.1.
 abstract interface class CoachRepository {
+  /// GET /coach/summary — angka ringkas untuk dashboard (online).
+  Future<CoachSummary> coachSummary();
+
   /// GET /coach/today-sessions (online).
   Future<TodaySessionsResult> todaySessions();
 

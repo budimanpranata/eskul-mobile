@@ -24,6 +24,10 @@ class CoachRepositoryImpl implements CoachRepository {
   final Future<bool> Function() _isOnline;
 
   @override
+  Future<CoachSummary> coachSummary() async =>
+      CoachSummary.fromJson(await _remote.summary());
+
+  @override
   Future<TodaySessionsResult> todaySessions() async =>
       TodaySessionsResult.fromJson(await _remote.todaySessions());
 
