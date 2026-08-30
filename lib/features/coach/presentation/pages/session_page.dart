@@ -28,6 +28,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
   late final TabController _tabs = TabController(length: 2, vsync: this);
   final _descCtrl = TextEditingController();
   final _targetCtrl = TextEditingController();
+  ProviderSubscription<Map<String, AttendanceDraft>>? _draftSub;
   bool _submitting = false;
   bool _restored = false;
   Map<int, String> _rowErrors = {};
@@ -38,16 +39,24 @@ class _SessionPageState extends ConsumerState<SessionPage>
   @override
   void initState() {
     super.initState();
-    final draft = ref.read(attendanceDraftsProvider.notifier).draftFor(_ekskulId);
-    _descCtrl.text = draft.materialDescription;
-    _targetCtrl.text = draft.targetAchievement;
+    // JANGAN memodifikasi state provider di initState (Riverpod 3 melarang mutasi
+    // saat widget tree sedang dibangun → "error provider" layar merah).
+    // Cukup baca draft yang sudah ada (jika ada) untuk mengisi field materi;
+    // pembuatan draft baru + restore dari DB dilakukan di `_restoreLocalDraft`
+    // yang berjalan setelah frame pertama.
+    final existing = ref.read(attendanceDraftsProvider)[_ekskulId];
+    if (existing != null) {
+      _descCtrl.text = existing.materialDescription;
+      _targetCtrl.text = existing.targetAchievement;
+    }
 
     // Tulis-lewat: setiap perubahan draft → simpan payload ke local DB.
-    ref.listenManual(attendanceDraftsProvider, (_, __) => _persistDraft());
+    _draftSub = ref.listenManual(attendanceDraftsProvider, (_, __) => _persistDraft());
   }
 
   @override
   void dispose() {
+    _draftSub?.close();
     _tabs.dispose();
     _descCtrl.dispose();
     _targetCtrl.dispose();
@@ -55,43 +64,58 @@ class _SessionPageState extends ConsumerState<SessionPage>
   }
 
   Future<void> _restoreLocalDraft(Roster roster) async {
-    if (_restored) return;
+    if (_restored || !mounted) return;
     _restored = true;
-    final store = ref.read(localSessionStoreProvider);
-    final existing = await store.findByEkskulDate(_ekskulId, _sessionDate);
     final notifier = ref.read(attendanceDraftsProvider.notifier);
+    // Buat/ambil draft in-memory di sini (aman — di luar fase build).
+    final current = notifier.draftFor(_ekskulId);
+    _descCtrl.text = current.materialDescription;
+    _targetCtrl.text = current.targetAchievement;
 
-    if (existing != null && existing.status != SyncStatus.synced) {
-      notifier.adoptExistingId(_ekskulId, existing.clientGeneratedId);
-      final atts = (existing.payload['attendances'] as List?) ?? const [];
-      for (final a in atts) {
-        final m = a as Map;
-        final sid = m['student_id'] as String;
-        final st = AttendanceStatus.values.firstWhere(
-          (s) => s.code == m['status'],
-          orElse: () => AttendanceStatus.hadir,
-        );
-        notifier.setStatus(_ekskulId, sid, st);
-        if (m['activeness_score'] != null || m['skill_notes'] != null || m['personal_notes'] != null) {
-          notifier.setEval(
-            _ekskulId,
-            sid,
-            activenessScore: m['activeness_score'] as int?,
-            skillNotes: (m['skill_notes'] as String?) ?? '',
-            personalNotes: (m['personal_notes'] as String?) ?? '',
+    try {
+      final store = ref.read(localSessionStoreProvider);
+      final existing = await store.findByEkskulDate(_ekskulId, _sessionDate);
+      if (!mounted) return;
+
+      if (existing != null && existing.status != SyncStatus.synced) {
+        notifier.adoptExistingId(_ekskulId, existing.clientGeneratedId);
+        final atts = (existing.payload['attendances'] as List?) ?? const [];
+        for (final a in atts) {
+          if (a is! Map) continue;
+          final sid = a['student_id'] as String?;
+          if (sid == null) continue;
+          final st = AttendanceStatus.values.firstWhere(
+            (s) => s.code == a['status'],
+            orElse: () => AttendanceStatus.hadir,
           );
+          notifier.setStatus(_ekskulId, sid, st);
+          if (a['activeness_score'] != null ||
+              a['skill_notes'] != null ||
+              a['personal_notes'] != null) {
+            notifier.setEval(
+              _ekskulId,
+              sid,
+              activenessScore: a['activeness_score'] as int?,
+              skillNotes: (a['skill_notes'] as String?) ?? '',
+              personalNotes: (a['personal_notes'] as String?) ?? '',
+            );
+          }
+        }
+        final mat = existing.payload['material'];
+        if (mat is Map) {
+          _descCtrl.text = (mat['description'] as String?) ?? '';
+          _targetCtrl.text = (mat['target_achievement'] as String?) ?? '';
+          notifier.setMaterial(_ekskulId,
+              description: _descCtrl.text,
+              durationMinutes: (mat['duration_minutes'] as int?) ?? 90,
+              targetAchievement: _targetCtrl.text);
         }
       }
-      final mat = existing.payload['material'] as Map?;
-      if (mat != null) {
-        _descCtrl.text = (mat['description'] as String?) ?? '';
-        _targetCtrl.text = (mat['target_achievement'] as String?) ?? '';
-        notifier.setMaterial(_ekskulId,
-            description: _descCtrl.text,
-            durationMinutes: (mat['duration_minutes'] as int?) ?? 90,
-            targetAchievement: _targetCtrl.text);
-      }
+    } catch (e) {
+      // Draft lokal korup / DB gagal dibaca → mulai bersih, jangan crash.
+      debugPrint('restore draft gagal: $e');
     }
+
     notifier.seedRoster(_ekskulId, roster.students.map((s) => s.id).toList());
     _persistDraft(roster: roster);
     if (mounted) setState(() {});
