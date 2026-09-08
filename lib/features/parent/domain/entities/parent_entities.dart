@@ -85,27 +85,64 @@ class MaterialEntry {
       );
 }
 
+/// Satu penilaian pembina untuk anak pada satu sesi (skor keaktifan + catatan).
+class EvalEntry {
+  const EvalEntry({
+    required this.date,
+    required this.activenessScore,
+    required this.skillNotes,
+    required this.personalNotes,
+    required this.coachName,
+  });
+
+  final String date;
+  final int? activenessScore; // 1..5
+  final String? skillNotes;
+  final String? personalNotes;
+  final String coachName;
+
+  bool get hasNotes =>
+      (skillNotes != null && skillNotes!.isNotEmpty) ||
+      (personalNotes != null && personalNotes!.isNotEmpty);
+
+  factory EvalEntry.fromJson(Map<String, dynamic> j) => EvalEntry(
+        date: j['date'] as String? ?? '',
+        activenessScore: (j['activeness_score'] as num?)?.toInt(),
+        skillNotes: j['skill_notes'] as String?,
+        personalNotes: j['personal_notes'] as String?,
+        coachName: j['coach_name'] as String? ?? '-',
+      );
+}
+
 class EkskulProgress {
   const EkskulProgress({
     required this.id,
     required this.name,
     required this.summary,
+    required this.averageActiveness,
     required this.activenessTrend,
+    required this.evaluations,
     required this.materials,
   });
 
   final String id;
   final String name;
   final AttendanceSummary summary;
+  final double? averageActiveness;
   final List<ActivenessPoint> activenessTrend;
+  final List<EvalEntry> evaluations;
   final List<MaterialEntry> materials;
 
   factory EkskulProgress.fromJson(Map<String, dynamic> j) => EkskulProgress(
         id: j['id'] as String,
         name: j['name'] as String,
         summary: AttendanceSummary.fromJson(j['attendance_summary'] as Map<String, dynamic>),
+        averageActiveness: (j['average_activeness'] as num?)?.toDouble(),
         activenessTrend: (j['activeness_trend'] as List)
             .map((e) => ActivenessPoint.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        evaluations: ((j['evaluations'] as List?) ?? const [])
+            .map((e) => EvalEntry.fromJson(e as Map<String, dynamic>))
             .toList(),
         materials: (j['materials_timeline'] as List)
             .map((e) => MaterialEntry.fromJson(e as Map<String, dynamic>))

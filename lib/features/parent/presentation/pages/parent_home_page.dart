@@ -117,20 +117,26 @@ class _ProgressView extends ConsumerWidget {
         },
         data: (p) {
           if (!p.hasAnySession) {
-            return ListView(children: [
-              const SizedBox(height: 80),
-              _Centered(
-                child: Text(
-                  '${p.studentName} belum memiliki sesi presensi yang tercatat.\n'
-                  'Data akan muncul setelah pembina melakukan presensi.',
-                  textAlign: TextAlign.center,
+            return ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                _ChildHeader(child: child),
+                const SizedBox(height: 40),
+                _Centered(
+                  child: Text(
+                    '${p.studentName} belum memiliki sesi presensi yang tercatat.\n'
+                    'Data akan muncul setelah pembina melakukan presensi.',
+                    textAlign: TextAlign.center,
+                  ),
                 ),
-              ),
-            ]);
+              ],
+            );
           }
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              _ChildHeader(child: child),
+              const SizedBox(height: 12),
               Align(
                 alignment: Alignment.centerRight,
                 child: _PeriodToggle(
@@ -143,9 +149,17 @@ class _ProgressView extends ConsumerWidget {
                 Text(ek.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 8),
                 _DonutCard(summary: ek.summary),
-                if (ek.activenessTrend.isNotEmpty) ...[
+                if (ek.averageActiveness != null || ek.activenessTrend.isNotEmpty) ...[
                   const SizedBox(height: 12),
-                  _ActivenessCard(points: ek.activenessTrend, period: period),
+                  _ActivenessCard(
+                    average: ek.averageActiveness,
+                    points: ek.activenessTrend,
+                    period: period,
+                  ),
+                ],
+                if (ek.evaluations.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _EvaluationsCard(items: ek.evaluations),
                 ],
                 if (ek.materials.isNotEmpty) ...[
                   const SizedBox(height: 12),
@@ -231,9 +245,22 @@ class _PeriodToggle extends StatelessWidget {
 }
 
 class _ActivenessCard extends StatelessWidget {
-  const _ActivenessCard({required this.points, required this.period});
+  const _ActivenessCard({
+    required this.average,
+    required this.points,
+    required this.period,
+  });
+  final double? average;
   final List<ActivenessPoint> points;
   final String period;
+
+  static (String, Color) _band(double v) {
+    if (v >= 4.5) return ('Sangat aktif', const Color(0xFF1E6F5C));
+    if (v >= 3.5) return ('Aktif', const Color(0xFF2E8B57));
+    if (v >= 2.5) return ('Cukup', const Color(0xFFB07C2F));
+    if (v >= 1.5) return ('Kurang aktif', const Color(0xFFB0642F));
+    return ('Perlu perhatian', const Color(0xFFB0402F));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -242,16 +269,51 @@ class _ActivenessCard extends StatelessWidget {
     ];
     final unit = period == 'monthly' ? 'per bulan' : 'per minggu';
     // Interval label sumbu-X: jarangkan bila titik banyak agar tidak tumpang tindih.
-    final labelEvery = (points.length / 4).ceil().clamp(1, points.length);
+    final labelEvery = (points.length / 4).ceil().clamp(1, points.isEmpty ? 1 : points.length);
     return Card(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 16, 16, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Tren keaktifan (1–5) $unit',
-                style: const TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 12),
+            const Text('Keaktifan', style: TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            if (average != null) ...[
+              Builder(builder: (_) {
+                final (label, color) = _band(average!);
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(average!.toStringAsFixed(1),
+                        style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: color)),
+                    const Text(' / 5', style: TextStyle(fontSize: 14, color: Colors.black54)),
+                    const SizedBox(width: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(label,
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
+                    ),
+                  ],
+                );
+              }),
+              const SizedBox(height: 2),
+              const Text('Rata-rata skor keaktifan yang diberi pembina (skala 1–5) tiap sesi anak hadir.',
+                  style: TextStyle(fontSize: 12, color: Colors.black54)),
+            ] else
+              const Text('Belum ada nilai keaktifan.',
+                  style: TextStyle(fontSize: 13, color: Colors.black54)),
+            if (points.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              Text('Tren $unit',
+                  style: const TextStyle(fontSize: 12, color: Colors.black54)),
+              const SizedBox(height: 8),
+            ],
+            if (points.isNotEmpty)
             SizedBox(
               height: 150,
               child: LineChart(
@@ -324,11 +386,112 @@ class _MaterialsCard extends StatelessWidget {
               const Divider(height: 16),
               Text(m.date, style: const TextStyle(fontSize: 12, color: Colors.black54)),
               Text(m.description),
-              if (m.coachFeedback != null && m.coachFeedback!.isNotEmpty)
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ChildHeader extends StatelessWidget {
+  const _ChildHeader({required this.child});
+  final Child child;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasPhoto = child.photoUrl != null && child.photoUrl!.isNotEmpty;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 26,
+              backgroundColor: const Color(0xFFE4EFEA),
+              backgroundImage: hasPhoto ? NetworkImage(child.photoUrl!) : null,
+              child: hasPhoto
+                  ? null
+                  : Text(
+                      child.fullName.characters.first.toUpperCase(),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, color: Color(0xFF155440)),
+                    ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(child.fullName,
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 2),
+                  Text('Kelas ${child.classGrade}   ·   NIS ${child.nis}',
+                      style: const TextStyle(color: Colors.black54, fontSize: 13)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EvaluationsCard extends StatelessWidget {
+  const _EvaluationsCard({required this.items});
+  final List<EvalEntry> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Penilaian pembina per sesi',
+                style: TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 2),
+            const Text('Skor keaktifan 1–5 dan catatan perkembangan anak.',
+                style: TextStyle(fontSize: 12, color: Colors.black54)),
+            for (final e in items) ...[
+              const Divider(height: 18),
+              Row(
+                children: [
+                  Text(e.date, style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                  const Spacer(),
+                  if (e.activenessScore != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE4EFEA),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text('Keaktifan ${e.activenessScore}/5',
+                          style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF155440))),
+                    ),
+                ],
+              ),
+              if (e.skillNotes != null && e.skillNotes!.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text('Keterampilan: ${e.skillNotes}'),
+                ),
+              if (e.personalNotes != null && e.personalNotes!.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 2),
-                  child: Text('Catatan ${m.coachName}: ${m.coachFeedback}',
-                      style: const TextStyle(fontStyle: FontStyle.italic, color: Colors.black87)),
+                  child: Text('Catatan pembina: ${e.personalNotes}',
+                      style: const TextStyle(fontStyle: FontStyle.italic)),
+                ),
+              if (!e.hasNotes)
+                const Padding(
+                  padding: EdgeInsets.only(top: 2),
+                  child: Text('Tanpa catatan tambahan.',
+                      style: TextStyle(fontSize: 12, color: Colors.black45)),
                 ),
             ],
           ],

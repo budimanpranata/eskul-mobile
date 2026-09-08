@@ -18,9 +18,26 @@ void main() {
             'alpa': 0,
             'percentage': 75.0,
           },
+          'average_activeness': 4.3,
           'activeness_trend': [
             {'bucket': '2026-08-03', 'label': '3 Agu', 'avg_score': 4.0, 'sessions': 2},
             {'bucket': '2026-08-10', 'label': '10 Agu', 'avg_score': 5.0, 'sessions': 1},
+          ],
+          'evaluations': [
+            {
+              'date': '2026-08-11',
+              'activeness_score': 5,
+              'skill_notes': 'Kontrol bola membaik',
+              'personal_notes': null,
+              'coach_name': 'Pak Budi',
+            },
+            {
+              'date': '2026-08-04',
+              'activeness_score': 4,
+              'skill_notes': null,
+              'personal_notes': 'Perlu lebih fokus saat pemanasan',
+              'coach_name': 'Pak Budi',
+            },
           ],
           'materials_timeline': [
             {
@@ -45,6 +62,12 @@ void main() {
     expect(ek.activenessTrend.map((a) => a.avgScore), [4.0, 5.0]);
     expect(ek.activenessTrend.map((a) => a.label), ['3 Agu', '10 Agu']);
     expect(ek.activenessTrend.first.sessions, 2);
+    expect(ek.averageActiveness, 4.3);
+    expect(ek.evaluations.length, 2);
+    expect(ek.evaluations.first.activenessScore, 5);
+    expect(ek.evaluations.first.skillNotes, 'Kontrol bola membaik');
+    expect(ek.evaluations.first.hasNotes, isTrue);
+    expect(ek.evaluations[1].personalNotes, 'Perlu lebih fokus saat pemanasan');
     expect(ek.materials.single.coachName, 'Pak Budi');
     expect(p.latestNotificationAt, '2026-08-11T16:40:00+07:00');
   });
