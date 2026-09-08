@@ -47,6 +47,12 @@ class _FakeRepo implements CoachRepository {
   @override
   Future<Roster> roster(String extracurricularId) => throw UnimplementedError();
   @override
+  Future<EkskulRoster> ekskulStudents(String extracurricularId) => throw UnimplementedError();
+  @override
+  Future<StudentProgress> studentProgress(String extracurricularId, String studentId,
+          {String period = 'weekly'}) =>
+      throw UnimplementedError();
+  @override
   Future<RosterStudent> resolveQr({required String qrToken, required String extracurricularId}) =>
       throw UnimplementedError();
   @override

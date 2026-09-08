@@ -64,6 +64,24 @@ final rosterProvider =
   return ref.watch(coachRepositoryProvider).roster(extracurricularId);
 });
 
+/// Daftar siswa + rekap ringkas untuk sebuah ekskul (layar "Siswa" pembina).
+final ekskulStudentsProvider =
+    FutureProvider.autoDispose.family<EkskulRoster, String>((ref, extracurricularId) {
+  return ref.watch(coachRepositoryProvider).ekskulStudents(extracurricularId);
+});
+
+typedef StudentProgressArgs = ({String extracurricularId, String studentId, String period});
+
+/// Perkembangan 1 siswa di 1 ekskul (kehadiran + tren & catatan penilaian).
+final studentProgressProvider =
+    FutureProvider.autoDispose.family<StudentProgress, StudentProgressArgs>((ref, a) {
+  return ref.watch(coachRepositoryProvider).studentProgress(
+        a.extracurricularId,
+        a.studentId,
+        period: a.period,
+      );
+});
+
 /// Daftar sesi lokal untuk layar Riwayat + badge pending.
 final pendingSessionsProvider = FutureProvider.autoDispose<List<PendingSession>>((ref) {
   return ref.watch(localSessionStoreProvider).listAll();

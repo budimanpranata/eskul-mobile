@@ -6,7 +6,9 @@ import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/providers/auth_providers.dart';
 import '../../features/coach/domain/entities/coach_entities.dart';
+import '../../features/coach/presentation/pages/coach_roster_page.dart';
 import '../../features/coach/presentation/pages/coach_shell.dart';
+import '../../features/coach/presentation/pages/coach_student_progress_page.dart';
 import '../../features/coach/presentation/pages/session_history_page.dart';
 import '../../features/coach/presentation/pages/session_page.dart';
 import '../../features/parent/presentation/pages/link_child_page.dart';
@@ -62,6 +64,21 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (_, state) => SessionPage(
               extracurricularId: state.pathParameters['id']!,
               session: state.extra is TodaySession ? state.extra as TodaySession : null,
+            ),
+          ),
+          GoRoute(
+            path: 'ekskul/:id/students',
+            builder: (_, state) => CoachRosterPage(
+              extracurricularId: state.pathParameters['id']!,
+              name: state.extra is String ? state.extra as String : 'Ekstrakurikuler',
+            ),
+          ),
+          GoRoute(
+            path: 'ekskul/:eid/student/:sid',
+            builder: (_, state) => CoachStudentProgressPage(
+              extracurricularId: state.pathParameters['eid']!,
+              studentId: state.pathParameters['sid']!,
+              studentName: state.extra is String ? state.extra as String : 'Siswa',
             ),
           ),
         ],

@@ -36,6 +36,11 @@ class QrFakeRemote implements CoachRemoteDataSource {
   Future<Map<String, dynamic>> todaySessions() => throw UnimplementedError();
   @override
   Future<Map<String, dynamic>> summary() => throw UnimplementedError();
+  @override
+  Future<Map<String, dynamic>> ekskulStudents(String id) => throw UnimplementedError();
+  @override
+  Future<Map<String, dynamic>> studentProgress(String id, String sid, String p) =>
+      throw UnimplementedError();
 }
 
 void main() {

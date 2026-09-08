@@ -24,6 +24,27 @@ class CoachRemoteDataSource {
     return r.data!;
   }
 
+  Future<Map<String, dynamic>> ekskulStudents(String extracurricularId) async {
+    final r = await _dio.get<Map<String, dynamic>>(
+      '/coach/extracurriculars/$extracurricularId/students',
+    );
+    _ensureOk(r);
+    return r.data!;
+  }
+
+  Future<Map<String, dynamic>> studentProgress(
+    String extracurricularId,
+    String studentId,
+    String period,
+  ) async {
+    final r = await _dio.get<Map<String, dynamic>>(
+      '/coach/extracurriculars/$extracurricularId/students/$studentId/progress',
+      queryParameters: {'period': period},
+    );
+    _ensureOk(r);
+    return r.data!;
+  }
+
   Future<Response<dynamic>> qrScan(String qrToken, String extracurricularId) {
     return _dio.post<dynamic>(
       '/coach/students/qr-scan',

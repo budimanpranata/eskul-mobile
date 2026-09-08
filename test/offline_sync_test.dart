@@ -81,6 +81,14 @@ class FakeRemote implements CoachRemoteDataSource {
         'todaySessionCount': 0,
         'pendingSubmitToday': 0,
       };
+
+  @override
+  Future<Map<String, dynamic>> ekskulStudents(String id) async =>
+      {'extracurricular': {'name': ''}, 'students': []};
+
+  @override
+  Future<Map<String, dynamic>> studentProgress(String id, String sid, String period) async =>
+      {'student': {'full_name': '', 'class_grade': ''}, 'attendance_summary': {}, 'evaluations': []};
 }
 
 Map<String, dynamic> _payload(String cgid) => {

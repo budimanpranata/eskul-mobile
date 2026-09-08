@@ -188,3 +188,154 @@ class QrScanException implements Exception {
   @override
   String toString() => message;
 }
+
+// ---------------- Daftar siswa + perkembangan per siswa (Fase pilot) ----------------
+
+/// Satu siswa di roster ekskul + rekap ringkas untuk daftar.
+class RosterStudentStat {
+  const RosterStudentStat({
+    required this.id,
+    required this.nis,
+    required this.fullName,
+    required this.classGrade,
+    required this.photoUrl,
+    required this.sessions,
+    required this.present,
+    required this.attendancePct,
+    required this.avgActiveness,
+  });
+
+  final String id;
+  final String nis;
+  final String fullName;
+  final String classGrade;
+  final String? photoUrl;
+  final int sessions;
+  final int present;
+  final double attendancePct;
+  final double? avgActiveness;
+
+  factory RosterStudentStat.fromJson(Map<String, dynamic> j) => RosterStudentStat(
+        id: j['id'] as String,
+        nis: j['nis'] as String,
+        fullName: j['fullName'] as String,
+        classGrade: j['classGrade'] as String,
+        photoUrl: j['photoUrl'] as String?,
+        sessions: (j['sessions'] as num?)?.toInt() ?? 0,
+        present: (j['present'] as num?)?.toInt() ?? 0,
+        attendancePct: (j['attendance_pct'] as num?)?.toDouble() ?? 0,
+        avgActiveness: (j['avg_activeness'] as num?)?.toDouble(),
+      );
+}
+
+class EkskulRoster {
+  const EkskulRoster({required this.name, required this.students});
+  final String name;
+  final List<RosterStudentStat> students;
+
+  factory EkskulRoster.fromJson(Map<String, dynamic> j) => EkskulRoster(
+        name: (j['extracurricular'] as Map<String, dynamic>)['name'] as String,
+        students: (j['students'] as List)
+            .map((e) => RosterStudentStat.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
+/// Satu titik tren keaktifan (agregat mingguan/bulanan dari backend).
+class TrendPoint {
+  const TrendPoint({required this.label, required this.avgScore, required this.sessions});
+  final String label;
+  final double avgScore;
+  final int sessions;
+
+  factory TrendPoint.fromJson(Map<String, dynamic> j) => TrendPoint(
+        label: (j['label'] ?? j['bucket'] ?? '') as String,
+        avgScore: (j['avg_score'] as num).toDouble(),
+        sessions: (j['sessions'] as num?)?.toInt() ?? 0,
+      );
+}
+
+/// Penilaian pembina untuk siswa pada satu sesi.
+class StudentEvalEntry {
+  const StudentEvalEntry({
+    required this.date,
+    required this.activenessScore,
+    required this.skillNotes,
+    required this.personalNotes,
+    required this.coachName,
+  });
+
+  final String date;
+  final int? activenessScore;
+  final String? skillNotes;
+  final String? personalNotes;
+  final String coachName;
+
+  bool get hasNotes =>
+      (skillNotes != null && skillNotes!.isNotEmpty) ||
+      (personalNotes != null && personalNotes!.isNotEmpty);
+
+  factory StudentEvalEntry.fromJson(Map<String, dynamic> j) => StudentEvalEntry(
+        date: j['date'] as String? ?? '',
+        activenessScore: (j['activeness_score'] as num?)?.toInt(),
+        skillNotes: j['skill_notes'] as String?,
+        personalNotes: j['personal_notes'] as String?,
+        coachName: j['coach_name'] as String? ?? '-',
+      );
+}
+
+/// Perkembangan satu siswa di satu ekskul (untuk mode Pembina).
+class StudentProgress {
+  const StudentProgress({
+    required this.studentName,
+    required this.classGrade,
+    required this.nis,
+    required this.photoUrl,
+    required this.ekskulName,
+    required this.totalSessions,
+    required this.hadir,
+    required this.izin,
+    required this.sakit,
+    required this.alpa,
+    required this.attendancePct,
+    required this.averageActiveness,
+    required this.trend,
+    required this.evaluations,
+  });
+
+  final String studentName;
+  final String classGrade;
+  final String nis;
+  final String? photoUrl;
+  final String ekskulName;
+  final int totalSessions, hadir, izin, sakit, alpa;
+  final double attendancePct;
+  final double? averageActiveness;
+  final List<TrendPoint> trend;
+  final List<StudentEvalEntry> evaluations;
+
+  factory StudentProgress.fromJson(Map<String, dynamic> j) {
+    final s = j['student'] as Map<String, dynamic>;
+    final a = j['attendance_summary'] as Map<String, dynamic>;
+    return StudentProgress(
+      studentName: s['full_name'] as String,
+      classGrade: s['class_grade'] as String,
+      nis: s['nis'] as String? ?? '-',
+      photoUrl: s['photo_url'] as String?,
+      ekskulName: (j['extracurricular'] as Map<String, dynamic>?)?['name'] as String? ?? '',
+      totalSessions: (a['total_sessions'] as num?)?.toInt() ?? 0,
+      hadir: (a['hadir'] as num?)?.toInt() ?? 0,
+      izin: (a['izin'] as num?)?.toInt() ?? 0,
+      sakit: (a['sakit'] as num?)?.toInt() ?? 0,
+      alpa: (a['alpa'] as num?)?.toInt() ?? 0,
+      attendancePct: (a['percentage'] as num?)?.toDouble() ?? 0,
+      averageActiveness: (j['average_activeness'] as num?)?.toDouble(),
+      trend: ((j['activeness_trend'] as List?) ?? const [])
+          .map((e) => TrendPoint.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      evaluations: ((j['evaluations'] as List?) ?? const [])
+          .map((e) => StudentEvalEntry.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}

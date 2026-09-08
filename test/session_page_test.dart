@@ -53,6 +53,14 @@ class _FakeRepo implements CoachRepository {
       throw UnimplementedError();
 
   @override
+  Future<EkskulRoster> ekskulStudents(String extracurricularId) => throw UnimplementedError();
+
+  @override
+  Future<StudentProgress> studentProgress(String extracurricularId, String studentId,
+          {String period = 'weekly'}) =>
+      throw UnimplementedError();
+
+  @override
   Future<SubmitOutcome> submit(String clientGeneratedId) => throw UnimplementedError();
 }
 

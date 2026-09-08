@@ -319,8 +319,10 @@ class _SessionCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () =>
-            context.push('/coach/session/${session.extracurricularId}', extra: session),
+        onTap: () => context.push(
+          '/coach/ekskul/${session.extracurricularId}/students',
+          extra: session.extracurricularName,
+        ),
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(

@@ -45,6 +45,20 @@ class CoachRepositoryImpl implements CoachRepository {
   }
 
   @override
+  Future<EkskulRoster> ekskulStudents(String extracurricularId) async =>
+      EkskulRoster.fromJson(await _remote.ekskulStudents(extracurricularId));
+
+  @override
+  Future<StudentProgress> studentProgress(
+    String extracurricularId,
+    String studentId, {
+    String period = 'weekly',
+  }) async =>
+      StudentProgress.fromJson(
+        await _remote.studentProgress(extracurricularId, studentId, period),
+      );
+
+  @override
   Future<RosterStudent> resolveQr({
     required String qrToken,
     required String extracurricularId,
