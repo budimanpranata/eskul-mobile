@@ -1,11 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Wajib untuk build release (debug/profile sudah punya sendiri). -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- Scan QR kartu siswa (mobile_scanner) — Fase 2.2 -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <application
         android:label="eskul_mobile"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true"><!-- PILOT: izinkan HTTP ke server IP. Hapus/batasi setelah pindah ke HTTPS. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
