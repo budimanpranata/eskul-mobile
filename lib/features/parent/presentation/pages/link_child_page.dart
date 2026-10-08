@@ -12,6 +12,7 @@ class LinkChildPage extends ConsumerStatefulWidget {
 }
 
 class _LinkChildPageState extends ConsumerState<LinkChildPage> {
+  final _schoolCode = TextEditingController();
   final _nis = TextEditingController();
   final _name = TextEditingController();
   bool _loading = false;
@@ -20,6 +21,7 @@ class _LinkChildPageState extends ConsumerState<LinkChildPage> {
 
   @override
   void dispose() {
+    _schoolCode.dispose();
     _nis.dispose();
     _name.dispose();
     super.dispose();
@@ -32,6 +34,7 @@ class _LinkChildPageState extends ConsumerState<LinkChildPage> {
     });
     try {
       await ref.read(parentRepositoryProvider).linkRequest(
+            schoolCode: _schoolCode.text.trim(),
             nis: _nis.text.trim(),
             studentName: _name.text.trim(),
           );
@@ -71,8 +74,17 @@ class _LinkChildPageState extends ConsumerState<LinkChildPage> {
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text('Masukkan NIS dan nama siswa persis seperti data sekolah.'),
+                  const Text('Masukkan kode sekolah, NIS, dan nama siswa persis seperti data sekolah.'),
                   const SizedBox(height: 16),
+                  TextField(
+                    controller: _schoolCode,
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(
+                      labelText: 'Kode Sekolah',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   TextField(
                     controller: _nis,
                     onChanged: (_) => setState(() {}),
@@ -96,7 +108,10 @@ class _LinkChildPageState extends ConsumerState<LinkChildPage> {
                   ],
                   const SizedBox(height: 20),
                   FilledButton(
-                    onPressed: _loading || _nis.text.trim().isEmpty || _name.text.trim().isEmpty
+                    onPressed: _loading ||
+                            _schoolCode.text.trim().isEmpty ||
+                            _nis.text.trim().isEmpty ||
+                            _name.text.trim().isEmpty
                         ? null
                         : _submit,
                     child: Text(_loading ? 'Mengirim…' : 'Ajukan'),

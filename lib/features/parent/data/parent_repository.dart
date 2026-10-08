@@ -4,7 +4,11 @@ import '../domain/entities/parent_entities.dart';
 
 abstract interface class ParentRepository {
   Future<List<Child>> children();
-  Future<void> linkRequest({required String nis, required String studentName});
+  Future<void> linkRequest({
+    required String schoolCode,
+    required String nis,
+    required String studentName,
+  });
   Future<ChildProgress> childProgress(String studentId, {String period = 'weekly'});
 }
 
@@ -21,10 +25,14 @@ class ParentRepositoryImpl implements ParentRepository {
   }
 
   @override
-  Future<void> linkRequest({required String nis, required String studentName}) async {
+  Future<void> linkRequest({
+    required String schoolCode,
+    required String nis,
+    required String studentName,
+  }) async {
     final r = await _dio.post<dynamic>(
       '/parent/link-request',
-      data: {'nis': nis, 'studentName': studentName},
+      data: {'schoolCode': schoolCode, 'nis': nis, 'studentName': studentName},
     );
     final code = r.statusCode ?? 0;
     if (code == 201) return;
