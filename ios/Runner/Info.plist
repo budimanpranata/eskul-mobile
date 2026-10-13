@@ -15,7 +15,9 @@
 	<key>CFBundleName</key>
 	<string>eskul_mobile</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Kamera dipakai untuk memindai QR Code kartu siswa saat presensi.</string>
+	<string>Kamera dipakai untuk memindai QR Code kartu siswa saat presensi, dan untuk memotret bukti transfer tagihan.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Galeri foto dipakai untuk memilih bukti transfer saat membayar tagihan ekskul.</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

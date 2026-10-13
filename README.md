@@ -14,7 +14,11 @@ Referensi arsitektur: `../system-design-ekosistem-ekskul-sd.md`
 > + **Scan QR** (2.2) + **nilai keaktifan & catatan personal per siswa** (2.3).
 > Mode Orang Tua: Dashboard + tab Notifikasi (1.4/1.5) + **tren keaktifan dengan
 > toggle Mingguan/Bulanan** (3.2: agregasi backend per minggu/bulan, `fl_chart`,
-> aman untuk data minim 1 titik).
+> aman untuk data minim 1 titik) + **tab Tagihan** (beyond-plan: lihat tagihan
+> ekskul anak, ajukan bayar transfer — unggah bukti via `image_picker` — atau
+> tunai, pantau status Belum Bayar/Menunggu Verifikasi/Lunas/Dibatalkan).
+> "Hubungkan ke Anak" kini juga minta **Kode Sekolah** (NIS unik per sekolah
+> sejak multi-tenant, bukan global lagi).
 >
 > **Catatan chart:** `fl_chart` dipin ke **^0.69.0** — versi 1.x memanggil
 > `Matrix4.translateByDouble`/`scaleByDouble` yang belum ada di `vector_math`
