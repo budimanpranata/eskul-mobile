@@ -13,6 +13,11 @@ class AppConfig {
     defaultValue: 'http://10.0.2.2:3100/api/v1',
   );
 
+  /// Origin server (tanpa `/api/v1`) — dipakai utk membangun URL gambar dari
+  /// path root-relative yang dikembalikan backend (mis. `logoUrl`, `proofUrl`),
+  /// yang SUDAH menyertakan prefix API sendiri.
+  static String get apiOrigin => apiBaseUrl.replaceFirst(RegExp(r'/api/v\d+/?$'), '');
+
   /// Timeout default request (ms).
   static const int connectTimeoutMs = 15000;
   static const int receiveTimeoutMs = 20000;

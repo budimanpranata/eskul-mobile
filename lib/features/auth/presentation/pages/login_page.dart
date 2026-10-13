@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/branding/branding.dart';
 import '../providers/auth_providers.dart';
 
 /// Layar Login (dokumen desain bagian 5.1 / 5.2).
@@ -53,6 +54,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final branding = ref.watch(brandingProvider).value;
+    final appName = branding?.appName ?? defaultAppName;
+    final logoUrl = branding?.absoluteLogoUrl;
+
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -62,7 +67,17 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('Ekskul SD',
+                SizedBox(
+                  height: 72,
+                  child: logoUrl != null
+                      ? Image.network(
+                          logoUrl,
+                          errorBuilder: (_, __, ___) => Image.asset(defaultLogoAsset),
+                        )
+                      : Image.asset(defaultLogoAsset),
+                ),
+                const SizedBox(height: 12),
+                Text(appName,
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.headlineMedium),
                 const SizedBox(height: 4),
