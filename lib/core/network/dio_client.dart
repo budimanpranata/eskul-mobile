@@ -19,6 +19,17 @@ Dio createDioClient(SecureStorage storage, {void Function()? onAuthFailure}) {
     ),
   );
 
+  // Single-flight: request paralel yang 401 bersamaan (mis. beberapa panggilan
+  // dashboard saat app dibuka lagi setelah lama idle) menumpang SATU percobaan
+  // refresh yang sama, bukan masing-masing memanggil /auth/refresh sendiri.
+  // Tanpa ini, refresh ke-2/ke-3 memakai refresh token yang SUDAH diputar
+  // (revoked) oleh refresh pertama yang lebih dulu selesai → gagal → sesi yang
+  // baru saja berhasil di-refresh ikut terhapus (storage.clear()).
+  Future<String?>? inflightRefresh;
+  Future<String?> refreshOnce() {
+    return inflightRefresh ??= _tryRefresh(storage).whenComplete(() => inflightRefresh = null);
+  }
+
   dio.interceptors.add(
     InterceptorsWrapper(
       onRequest: (options, handler) async {
@@ -33,7 +44,7 @@ Dio createDioClient(SecureStorage storage, {void Function()? onAuthFailure}) {
         final alreadyRetried = req.extra['__retried'] == true;
 
         if (is401 && !isAuthCall && !alreadyRetried) {
-          final refreshed = await _tryRefresh(storage);
+          final refreshed = await refreshOnce();
           if (refreshed != null) {
             req.extra['__retried'] = true;
             req.headers['Authorization'] = 'Bearer $refreshed';
@@ -59,7 +70,21 @@ Future<String?> _tryRefresh(SecureStorage storage) async {
   final refresh = await storage.refreshToken;
   if (refresh == null) return null;
   try {
-    final bare = Dio(BaseOptions(baseUrl: AppConfig.apiBaseUrl));
+    // PENTING: timeout eksplisit. Tanpa ini, Dio menunggu TANPA BATAS WAKTU —
+    // kalau jaringan macet tepat saat app dibuka lagi setelah lama idle
+    // (umum terjadi: radio/Wi-Fi baru bangun dari deep sleep), `await` di
+    // bawah tidak pernah selesai, request asli yang memicu refresh ini pun
+    // tidak pernah resolve, dan provider yang menunggunya macet di loading
+    // selamanya — satu-satunya jalan keluar yang terlihat user adalah logout
+    // manual lalu login ulang. Dengan timeout, refresh gagal cepat & jatuh ke
+    // alur sesi-habis (storage.clear() + onAuthFailure) yang sudah benar.
+    final bare = Dio(
+      BaseOptions(
+        baseUrl: AppConfig.apiBaseUrl,
+        connectTimeout: const Duration(milliseconds: AppConfig.connectTimeoutMs),
+        receiveTimeout: const Duration(milliseconds: AppConfig.receiveTimeoutMs),
+      ),
+    );
     final r = await bare.post<Map<String, dynamic>>(
       '/auth/refresh',
       data: {'refreshToken': refresh},
